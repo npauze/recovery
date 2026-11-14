@@ -1,0 +1,194 @@
+/* Seed content: program, exercise library, rehab content.
+   General guidance only, built around the surgeon's stated limits. Not PT or medical advice. */
+window.SEED = (function () {
+  'use strict';
+  var L = [];
+  // safety: safe = left arm not involved; caution = OK only if the left arm stays fully passive;
+  // avoid = loads, grips, or braces with the left arm (not until cleared)
+  function lib(id, name, cat, kind, safety, notes) {
+    L.push({ id: id, name: name, cat: cat, kind: kind, safety: safety, notes: notes });
+  }
+  // Quads / squat pattern
+  lib('belt-squat', 'Belt squat', 'quads', 'lb', 'safe', 'Load the belt, not your hands. If the machine has handles, guide with the right only.');
+  lib('hack-squat', 'Hack squat', 'quads', 'lb', 'caution', "Back on the pad. Don't hang on the left handle.");
+  lib('leg-press', 'Leg press', 'quads', 'lb', 'safe', 'Feet only. Left arm in your lap, not on the handles.');
+  lib('sl-leg-press', 'Single-leg press', 'quads', 'lb', 'safe', 'One leg at a time. Left arm in your lap, not on the handles.');
+  lib('v-squat', 'V-squat / pendulum (machine)', 'quads', 'lb', 'caution', 'Machine only. No barbell on the back. Left hand off the handles.');
+  lib('leg-ext', 'Leg extension', 'quads', 'lb', 'safe', 'Selectorized. No need to grip with the left.');
+  lib('sl-leg-ext', 'Single-leg extension', 'quads', 'lb', 'safe', 'One leg at a time.');
+  lib('walk-lunge-r', 'Walking lunge, DB in right hand', 'quads', 'lb', 'safe', 'Dumbbell in the right hand only. Left arm relaxed. 8/leg.');
+  lib('bss-r', 'Bulgarian split squat, DB in right hand', 'quads', 'lb', 'safe', 'Rear foot on a bench. Weight in the right hand only.');
+  lib('rev-lunge-r', 'Reverse lunge, DB in right hand', 'quads', 'lb', 'safe', 'Step back. Left arm stays relaxed. 8/leg.');
+  lib('bw-split-squat', 'Bodyweight split squat', 'quads', 'none', 'safe', 'No load if lunges feel awkward to balance.');
+  lib('step-up-r', 'Step-up, DB in right hand', 'quads', 'lb', 'safe', 'Low box. Weight in the right hand only. Left arm relaxed.');
+  lib('bb-back-squat', 'Barbell back squat', 'quads', 'lb', 'avoid', 'Both hands hold and brace the bar. Not until cleared.');
+  lib('smith-squat', 'Smith machine squat', 'quads', 'lb', 'avoid', 'Both hands on the bar. Not until cleared.');
+  // Hamstrings / hinge
+  lib('seated-curl', 'Seated leg curl', 'hams', 'lb', 'safe', 'Selectorized machine. No gripping with the left.');
+  lib('lying-curl', 'Lying leg curl', 'hams', 'lb', 'safe', 'Same pattern, different machine. Left hand off the handles.');
+  lib('sl-curl', 'Single-leg curl', 'hams', 'lb', 'safe', 'Same machine, one leg at a time.');
+  lib('back-ext', '45° back extension, arms crossed', 'hams', 'none', 'caution', "Arms across the chest. Don't push off with the left getting in or out.");
+  lib('deadlift', 'Two-hand deadlift / RDL', 'hams', 'lb', 'avoid', 'Grips and loads the left arm. Not until cleared.');
+  // Hips / glutes
+  lib('hip-abd', 'Hip abduction machine', 'hips', 'lb', 'safe', 'Sit tall. Hands off, or right hand only for balance.');
+  lib('hip-add', 'Hip adduction machine', 'hips', 'lb', 'safe', 'Same setup rules.');
+  lib('cable-abd', 'Cable hip abduction, ankle cuff', 'hips', 'lb', 'safe', "Ankle cuff. Right hand on the frame if needed. Don't hold on with the left.");
+  lib('glute-kick', 'Glute kickback machine', 'hips', 'lb', 'caution', 'Chest pad only. Left arm relaxed, not bracing.');
+  lib('hip-thrust-machine', 'Hip thrust machine', 'hips', 'lb', 'caution', 'Belt or pad over the hips. Left hand off the handles.');
+  // Calves
+  lib('seated-calf', 'Seated calf raise', 'calves', 'lb', 'safe', "Machine pad on the knees. Don't hold a heavy DB in the left hand.");
+  lib('lp-calf', 'Leg-press calf raise', 'calves', 'lb', 'safe', 'Feet on the lower edge; hands off the handles.');
+  lib('standing-calf', 'Standing calf machine', 'calves', 'lb', 'safe', 'Shoulders under the pads. No heavy left-hand grip.');
+  // Core
+  lib('dead-bug', 'Dead bugs', 'core', 'none', 'safe', 'Slow. Low back stays down. 8/side. No weight in the left hand.');
+  lib('heel-taps', 'Heel taps', 'core', 'none', 'safe', 'On your back, small range, no reaching with the left.');
+  lib('bench-leg-raise', 'Bench leg raises', 'core', 'none', 'caution', 'Right hand may lightly hold the bench; left stays off and unloaded.');
+  lib('decline-situp', 'Decline sit-ups, arms crossed', 'core', 'none', 'safe', 'Arms across the chest. No plate in the left hand.');
+  lib('machine-crunch', 'Machine crunch (pads)', 'core', 'lb', 'caution', 'Use pads, not handles or a rope, if both arms would have to pull.');
+  lib('cable-crunch', 'Cable crunch, left arm passive', 'core', 'lb', 'caution', 'Only if the left arm stays completely unloaded: no pulling, no hanging on the rope.');
+  lib('pallof-r', 'Pallof press, right only', 'core', 'lb', 'caution', 'Light to moderate, standing or half-kneeling. Skip if the left arm starts to brace.');
+  lib('suitcase-hold-r', 'Suitcase hold, right hand', 'core', 'lb', 'safe', 'Short holds. Left arm free. No left-hand carry.');
+  lib('plank', 'Hand or forearm plank', 'core', 'none', 'avoid', 'Puts body weight through the left arm. Not until cleared.');
+  lib('hanging-raise', 'Hanging leg raise', 'core', 'none', 'avoid', 'Hanging loads the repair. Not until cleared.');
+  lib('bird-dog', 'Bird-dog', 'core', 'none', 'avoid', 'Weight goes through the left hand. Not until cleared.');
+  // Push (right)
+  lib('machine-press-r', 'Single-arm machine chest press, right', 'push', 'lb', 'safe', 'Right arm only. Left hand off the handle, arm resting on your torso.');
+  lib('db-bench-r', 'Single-arm DB bench, right', 'push', 'lb', 'caution', 'Left arm rests on your torso. Do not use it to brace on the bench.');
+  lib('landmine-r', 'Landmine press, right', 'push', 'lb', 'safe', 'Right hand only. Left arm relaxed at your side.');
+  lib('pec-deck-r', 'Pec deck, right only', 'push', 'lb', 'caution', 'Use one arm if the machine allows; otherwise use a swap.');
+  lib('db-ohp-r', 'Seated single-arm DB press, right', 'push', 'lb', 'safe', 'Back supported. Left arm in your lap.');
+  lib('pushup', 'Push-ups', 'push', 'none', 'avoid', 'Body weight on the left arm. Not until cleared.');
+  lib('bb-bench', 'Barbell bench press', 'push', 'lb', 'avoid', 'Two-hand grip loads the left arm. Not until cleared.');
+  lib('dips', 'Dips', 'push', 'none', 'avoid', 'Full body weight on both arms. Not until cleared.');
+  // Pull (right)
+  lib('cs-row-r', 'Chest-supported row, right arm', 'pull', 'lb', 'safe', 'Chest on the pad so the left arm does not brace. Right arm only.');
+  lib('cable-row-r', 'Single-arm cable row, right', 'pull', 'lb', 'safe', 'Seated; left arm in your lap. Do not hold the stack or bench with the left.');
+  lib('machine-row-r', 'Single-arm machine row, right', 'pull', 'lb', 'safe', 'Chest or stomach supported. Left hand off.');
+  lib('pulldown-r', 'Single-arm lat pulldown, right', 'pull', 'lb', 'caution', 'Thigh pad holds you down. Left arm in your lap, not on the frame.');
+  lib('pullup', 'Pull-ups / chin-ups', 'pull', 'none', 'avoid', 'Hanging and pulling load the repair. Not until cleared.');
+  lib('two-arm-row', 'Two-arm row (any)', 'pull', 'lb', 'avoid', 'Left arm pulls. Not until cleared.');
+  // Delts (right)
+  lib('lat-raise-r', 'Single-arm lateral raise, right', 'delts', 'lb', 'safe', 'Cable or DB, right only.');
+  lib('machine-lat-r', 'Machine lateral raise, right', 'delts', 'lb', 'safe', 'Right arm only if the machine is independent.');
+  lib('cable-lat-r', 'Cable lateral raise, right', 'delts', 'lb', 'safe', 'Stand clear of the stack; left arm relaxed.');
+  lib('rear-delt-r', 'Cable rear-delt fly, right', 'delts', 'lb', 'safe', 'Right arm only. Left arm relaxed at your side.');
+  // Arms (right)
+  lib('curl-r', 'Single-arm curl, right', 'arms', 'lb', 'safe', 'DB, cable, or preacher, right only. Left side stays unloaded ROM, not a matching set.');
+  lib('cable-curl-r', 'Cable curl, right', 'arms', 'lb', 'safe', 'Right hand only; left arm at your side.');
+  lib('preacher-r', 'Machine preacher curl, right', 'arms', 'lb', 'safe', 'One arm. Do not load the left.');
+  lib('pushdown-r', 'Single-arm cable pushdown, right', 'arms', 'lb', 'safe', "Right arm only. Don't use the left to steady the cable.");
+  lib('kickback-r', 'Single-arm DB kickback, right', 'arms', 'lb', 'caution', 'Hinge and keep the left arm hanging relaxed. Don\u2019t brace on the bench with the left.');
+  lib('tri-machine-r', 'One-arm triceps machine, right', 'arms', 'lb', 'safe', 'If the station is independent; otherwise use a swap.');
+  lib('left-curl', 'Left-arm curl or supination, loaded', 'arms', 'lb', 'avoid', 'Resisted left curls/supination are off until your surgeon clears them.');
+  lib('farmer-carry', 'Farmer carry, both hands', 'arms', 'lb', 'avoid', 'Heavy left-hand grip. Not until cleared.');
+  // Cardio
+  lib('bike', 'Stationary bike, hands-free', 'cardio', 'min', 'safe', "Hands on your thighs or the seat, not the bars, if you'd be leaning on the left.");
+  lib('recumbent', 'Recumbent bike', 'cardio', 'min', 'safe', 'Easy default. Keep the left arm in your lap.');
+  lib('incline-walk', 'Incline walk, hands-free', 'cardio', 'min', 'safe', "Light or no rail use. Don't grip with the left.");
+  lib('stairs', 'Stair climber, hands-free', 'cardio', 'min', 'caution', "Only if balance is solid. Don't hang on the rails.");
+  lib('sled', 'Sled push / pull', 'cardio', 'min', 'avoid', 'Loads both arms. Not until cleared.');
+  lib('rower', 'Rowing machine', 'cardio', 'min', 'avoid', 'Pulls with both arms. Not until cleared.');
+  lib('air-bike-arms', 'Air bike using the handles', 'cardio', 'min', 'avoid', 'Push/pull with both arms. Use hands-free bikes instead.');
+
+  function it(ex, sets, reps, load, note, alts) {
+    return { ex: ex, sets: sets, reps: reps, load: load, note: note || '', alts: alts || [] };
+  }
+
+  var days = [
+    {
+      id: 'legs-a', name: 'Legs A', weekdays: [1],
+      focus: 'Squat-pattern machines and single-leg work. Left arm stays in your lap or relaxed at your side.',
+      items: [
+        it('belt-squat', 3, 10, 0, '', ['hack-squat', 'leg-press', 'v-squat']),
+        it('leg-press', 3, 10, 0, '', ['sl-leg-press', 'hack-squat']),
+        it('walk-lunge-r', 3, 8, 0, '', ['bss-r', 'rev-lunge-r', 'bw-split-squat']),
+        it('seated-curl', 3, 12, 0, '', ['sl-curl', 'lying-curl']),
+        it('seated-calf', 3, 12, 0, '', ['lp-calf', 'standing-calf']),
+        it('dead-bug', 2, 8, 0, '', ['bench-leg-raise', 'heel-taps'])
+      ]
+    },
+    {
+      id: 'upper', name: 'Upper (right arm + core)', weekdays: [2],
+      focus: 'Right-side work is intentional (cross-education). Left arm stays at ROM / under the cap and does not brace or grip.',
+      items: [
+        it('machine-press-r', 3, 10, 0, '', ['db-bench-r', 'landmine-r', 'pec-deck-r']),
+        it('cs-row-r', 3, 10, 0, '', ['cable-row-r', 'machine-row-r']),
+        it('lat-raise-r', 3, 12, 0, '', ['machine-lat-r', 'cable-lat-r']),
+        it('pushdown-r', 3, 12, 0, '', ['kickback-r', 'tri-machine-r']),
+        it('curl-r', 3, 10, 0, '', ['cable-curl-r', 'preacher-r']),
+        it('pallof-r', 3, 10, 0, '', ['dead-bug', 'suitcase-hold-r']),
+        it('bench-leg-raise', 3, 10, 0, '', ['cable-crunch', 'decline-situp', 'machine-crunch'])
+      ]
+    },
+    {
+      id: 'legs-b', name: 'Legs B', weekdays: [4],
+      focus: 'Quad- and hinge-friendly machines, plus hips and calves. Same left-arm rules as Legs A.',
+      items: [
+        it('hack-squat', 3, 10, 0, '', ['belt-squat', 'leg-press']),
+        it('leg-ext', 3, 12, 0, '', ['sl-leg-ext']),
+        it('sl-leg-press', 3, 10, 0, '10/leg. Left arm in your lap, not on the handles.', ['rev-lunge-r', 'bss-r']),
+        it('seated-curl', 3, 12, 0, 'Controlled reps. No left-hand gripping.', ['lying-curl', 'sl-curl']),
+        it('hip-abd', 2, 12, 0, '', ['hip-add', 'cable-abd']),
+        it('standing-calf', 3, 12, 0, '', ['lp-calf', 'seated-calf']),
+        it('bike', 1, 1, 12, 'Optional 10–15 min finisher. No leaning or hanging on the left arm.', ['incline-walk', 'recumbent'])
+      ]
+    },
+    {
+      id: 'cond', name: 'Conditioning + core', weekdays: [5],
+      focus: "Hands-free cardio plus core that never loads or braces on the left arm. Don't lean or hang on rails or bars with the left.",
+      items: [
+        it('bike', 1, 1, 30, '', ['incline-walk', 'stairs', 'recumbent']),
+        it('dead-bug', 3, 8, 0, '', ['heel-taps', 'decline-situp']),
+        it('pallof-r', 3, 10, 0, '', ['suitcase-hold-r', 'dead-bug']),
+        it('bench-leg-raise', 3, 10, 0, 'Default core finisher. Right hand may lightly hold the bench; left stays off and unloaded.', ['cable-crunch', 'decline-situp', 'machine-crunch'])
+      ]
+    }
+  ];
+
+  var rehab = {
+    rom: [
+      ['Elbow flexion and extension', "Gentle, slow, active motion. Don't force end range or add weight."],
+      ['Slow pronation and supination', 'Unloaded. Elbow at your side. Turn the palm up and down without resistance.'],
+      ['Soft grip squeezes', 'Towel or a soft ball. Easy squeezes only, not a hard crush. Stop at any pain.'],
+      ['Wrist mobility', 'Easy circles, flexion, and extension. No added load.'],
+      ['Shoulder mobility', "Pendulums or easy scap squeezes. Don't plant the left hand or hang from it."]
+    ],
+    redFlags: ['Sharp pain', 'A pop or sudden give', 'New swelling or bruising', 'Numbness or tingling', 'Fever, or wound redness, drainage, or opening'],
+    phases: [
+      ['Weeks 0–2', 'Protection, swelling control, and only the motion your surgeon allowed. No training load on the left arm.', 0, 14],
+      ['Weeks 2–6', 'Work toward full, pain-free ROM. Left arm under the cap. Train legs, core, right arm, and cardio hard within the hard stops.', 14, 42],
+      ['Weeks 6–12', 'Only after surgeon clearance. If cleared, this is typically when a gradual strengthening plan can start. Do not begin it on your own.', 42, 84],
+      ['Weeks 12+', 'Typically a slower return toward normal two-arm loading, if and when cleared. Still up to the surgeon, not this app.', 84, 9999]
+    ],
+    offLimits: [
+      'Push-ups, hand planks, dips, pull-ups, hanging, bird-dog',
+      'Barbell back squat, two-hand deadlift, left-arm or two-arm rows',
+      'Sled push, rower, or anything you have to hang on to with the left arm',
+      'Left-arm load over the cap, or resisted left grip, curl, or supination'
+    ],
+    useThese: [
+      'Belt squat, hack squat, leg press, leg extension and curl, calf machines',
+      'Single-leg work with a DB in the right hand, or no load',
+      'Right-arm only press, row, raise, curl, and landmine',
+      'Dead bugs, cautious right-hand Pallof, decline sit-ups, bench leg raises',
+      'Bike, incline walk, or stair climber with the left arm unloaded'
+    ],
+    habits: [
+      ['protein', 'Protein ~1 g/lb goal bodyweight'],
+      ['sleep', 'Sleep ~8 hours'],
+      ['collagen', 'Collagen 15 g + vitamin C (optional)']
+    ],
+    questions: [
+      'Can the left-arm load cap move past ~8 lb, and if so, to what?',
+      'When can I start light resisted left elbow flexion or supination?',
+      'Brace: keep it, wean it, or any remaining ROM limit?',
+      'Do you want me in formal PT now?',
+      'When are two-hand lifts, rows, planks, or pull-ups on the table?',
+      'Any limits on gripping, carrying, driving, or work?',
+      'What symptoms mean I overdid it and should call?',
+      'Are light isometrics or bands on the left okay after this visit?'
+    ]
+  };
+
+  return { library: L, days: days, rehab: rehab };
+})();

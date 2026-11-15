@@ -27,6 +27,11 @@
     var painLast = !!(H.length && H[0].pain);
     var withSets = H.filter(function (h) { return h.sets && h.sets.length; });
     var last = withSets[0] || null;
+    // Pain hold: never prescribe more sets than last time, even if the program calls for more.
+    if (painLast && last && last.sets && last.sets.length) {
+      var holdN = k === 'min' ? 1 : (working(last.sets).length || last.sets.length);
+      if (holdN > 0 && n > holdN) n = holdN;
+    }
     var res = { action: 'start', label: 'Start', tone: 'info', why: '', w: 0, reps: [], mins: 0, lv: 0, sets: n, last: last, rmin: rmin, rmax: rmax };
     function fill(v) { var a = []; for (var i = 0; i < n; i++) a.push(typeof v === 'function' ? v(i) : v); return a; }
     function capW(w) { return lh ? Math.min(w, cap) : w; }

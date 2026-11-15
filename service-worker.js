@@ -1,7 +1,7 @@
 /* Offline-first cache for the app shell. Bump VERSION when files change. */
-const VERSION = 'recovery-v4';
+const VERSION = 'recovery-v5';
 const ASSETS = [
-  './', './index.html', './styles.css', './data.js', './progress.js', './app.js', './manifest.webmanifest',
+  './', './index.html', './styles.css', './data.js', './progress.js', './coach.js', './app.js', './manifest.webmanifest',
   './icon-192.png', './icon-512.png', './apple-touch-icon.png'
 ];
 self.addEventListener('install', (e) => {

@@ -228,3 +228,11 @@ a { color: var(--acc); font-weight: 600; }
   .workout-card, .recent-card { padding: 12px 12px; }
   .workout-card .nm, .recent-card .nm { font-size: 17px; }
 }
+
+/* v5: send to coach */
+.heading-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin: 22px 0 8px; }
+.heading-row h2 { margin: 0; }
+.heading-row .btn { flex: none; }
+.finish-card h3 { margin-bottom: 4px; }
+.btn.coach { min-height: 48px; font-size: 16px; margin-top: 8px; }
+textarea.share-text { font: 14px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; min-height: 200px; white-space: pre; overflow: auto; }

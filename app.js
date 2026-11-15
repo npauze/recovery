@@ -32,7 +32,7 @@
 
   // ---------- state ----------
   var P = window.PROG;
-  var SCHEMA = 2;
+  var SCHEMA = 3;
   function seedDays() {
     return SEED.days.map(function (d) {
       return { id: d.id, name: d.name, focus: d.focus, weekdays: d.weekdays.slice(), items: d.items.map(function (it) { var x = clone(it); x.id = uid(); return x; }) };
@@ -50,15 +50,29 @@
       dec8: { checked: {}, answers: '' }
     };
   }
+  var PROGRAM_BAK = 'nick-recovery-program-pre-v3';
+  // One-time copies of pre-upgrade data. Never overwrites an existing backup.
+  function backupPreUpgrade(s, raw) {
+    if ((s.v || 1) >= SCHEMA) return;
+    if (raw && !localStorage.getItem(KEY + '-pre-v' + SCHEMA)) {
+      try { localStorage.setItem(KEY + '-pre-v' + SCHEMA, raw); } catch (e) { /* storage full: skip the copy */ }
+    }
+    if ((s.v || 1) < 3 && !localStorage.getItem(PROGRAM_BAK)) {
+      try {
+        localStorage.setItem(PROGRAM_BAK, JSON.stringify({ v: s.v || 1, days: s.days || [], savedAt: new Date().toISOString() }));
+      } catch (e) { /* storage full: skip the copy */ }
+    }
+  }
   // Upgrades any older saved shape in place. Never drops logged data.
   function migrate(s) {
+    var from = s.v || 1;
     var b = seedState();
     s.settings = Object.assign({}, b.settings, s.settings || {});
     if (!Array.isArray(s.library)) s.library = b.library;
     var have = {}; s.library.forEach(function (x) { have[x.id] = 1; });
     b.library.forEach(function (x) { if (!have[x.id]) s.library.push(x); });
     s.library.forEach(function (x) { if (x.leftHold == null) x.leftHold = x.safety === 'avoid'; });
-    if (!Array.isArray(s.days)) s.days = b.days;
+    if (!Array.isArray(s.days) || from < 3) s.days = b.days;
     s.days.forEach(function (d) { d.weekdays = Array.isArray(d.weekdays) ? d.weekdays : []; d.items = Array.isArray(d.items) ? d.items : []; d.items.forEach(function (it) { if (!it.id) it.id = uid(); }); });
     s.exCfg = s.exCfg && typeof s.exCfg === 'object' ? s.exCfg : {};
     s.logs = s.logs && typeof s.logs === 'object' ? s.logs : {};
@@ -83,10 +97,7 @@
       var raw = localStorage.getItem(KEY);
       if (raw) {
         var parsed = JSON.parse(raw);
-        // one-time safety copy of the pre-upgrade data
-        if ((parsed.v || 1) < SCHEMA && !localStorage.getItem(KEY + '-pre-v' + SCHEMA)) {
-          try { localStorage.setItem(KEY + '-pre-v' + SCHEMA, raw); } catch (e) { /* storage full: skip the copy */ }
-        }
+        backupPreUpgrade(parsed, raw);
         var m = migrate(parsed);
         try { localStorage.setItem(KEY, JSON.stringify(m)); } catch (e) { /* ignore */ }
         return m;
@@ -225,7 +236,7 @@
   var WHOOP = {
     green: { lead: 'Green: push for progress', tone: 'ok', body: 'Full sets. Each lift shows today\u2019s target from last time: add a rep or add weight. Left arm stays pain-free and under the cap.' },
     yellow: { lead: 'Yellow: repeat last time', tone: 'warn', body: 'One fewer set on most lifts (min 2). Same weights and reps as last time, no increases. Leave 2\u20133 reps in reserve.' },
-    red: { lead: 'Red: keep it easy', tone: 'bad', body: 'About half the sets, weights ~10% lighter, cardio ~60%. Or switch to Conditioning and do 20\u201330 min easy plus ROM. Skip intensity.' }
+    red: { lead: 'Red: keep it easy', tone: 'bad', body: 'About half the sets, weights ~10% lighter, cardio ~60%. Or skip the lifts and do 20\u201330 min easy bike or incline walk plus ROM. Skip intensity.' }
   };
   function scaledSets(it, whoop, kind) {
     var sets = it.sets || 3;
@@ -1021,6 +1032,7 @@
         if (!data || !Array.isArray(data.days) || !Array.isArray(data.library)) throw new Error('Not a backup file');
         var n = Object.keys(data.logs || {}).length;
         if (!confirm('Replace everything on this phone with this backup (' + data.days.length + ' days, ' + n + ' logged dates)?')) return;
+        backupPreUpgrade(data, JSON.stringify(data));
         state = migrate(data); save(); ui.date = todayKey(); render(); toast('Backup restored');
       } catch (err) { alert('Could not import: ' + err.message); }
     };

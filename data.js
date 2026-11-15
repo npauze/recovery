@@ -35,6 +35,12 @@ window.SEED = (function () {
   lib('cable-abd', 'Cable hip abduction, ankle cuff', 'hips', 'lb', 'safe', "Ankle cuff. Right hand on the frame if needed. Don't hold on with the left.");
   lib('glute-kick', 'Glute kickback machine', 'hips', 'lb', 'caution', 'Chest pad only. Left arm relaxed, not bracing.');
   lib('hip-thrust-machine', 'Hip thrust machine', 'hips', 'lb', 'caution', 'Belt or pad over the hips. Left hand off the handles.');
+  lib('glute-bridge', 'Glute bridge', 'hips', 'none', 'safe', 'On your back, feet planted. No weight, or a light pad on the hips set with the right hand.');
+  lib('sl-glute-bridge', 'Single-leg glute bridge', 'hips', 'none', 'safe', 'One leg at a time. No weight in the left hand.');
+  lib('cable-kickback', 'Cable glute kickback, ankle cuff', 'hips', 'lb', 'safe', 'Ankle cuff, not a handle. Right hand on the frame if needed. Left arm relaxed.');
+  lib('reverse-hyper', 'Reverse hyper', 'hips', 'lb', 'caution', 'Lie on the pad. Hold the handles lightly with the right only; left arm off and unloaded.');
+  lib('sl-rdl-r', 'Single-leg RDL, DB in right hand', 'hams', 'lb', 'safe', 'Dumbbell in the right hand only. Left arm relaxed. 8/leg.');
+  lib('nordic-curl', 'Nordic hamstring curl', 'hams', 'none', 'safe', 'Hook your heels; no need to use the left arm. Shorten the range if you cannot control the lower.');
   // Calves
   lib('seated-calf', 'Seated calf raise', 'calves', 'lb', 'safe', "Machine pad on the knees. Don't hold a heavy DB in the left hand.");
   lib('lp-calf', 'Leg-press calf raise', 'calves', 'lb', 'safe', 'Feet on the lower edge; hands off the handles.');
@@ -96,51 +102,57 @@ window.SEED = (function () {
 
   var days = [
     {
-      id: 'legs-a', name: 'Legs A', weekdays: [1],
-      focus: 'Squat-pattern machines and single-leg work. Left arm stays in your lap or relaxed at your side.',
+      id: 'quads-push', name: 'Quads + Push', weekdays: [1],
+      focus: 'Quad-dominant machines and single-leg work, plus a short right-arm press block. Left arm stays in your lap or relaxed at your side.',
       items: [
         it('belt-squat', 3, 10, 0, '', ['hack-squat', 'leg-press', 'v-squat']),
         it('leg-press', 3, 10, 0, '', ['sl-leg-press', 'hack-squat']),
-        it('walk-lunge-r', 3, 8, 0, '', ['bss-r', 'rev-lunge-r', 'bw-split-squat']),
-        it('seated-curl', 3, 12, 0, '', ['sl-curl', 'lying-curl']),
-        it('seated-calf', 3, 12, 0, '', ['lp-calf', 'standing-calf']),
-        it('dead-bug', 2, 8, 0, '', ['bench-leg-raise', 'heel-taps'])
+        it('walk-lunge-r', 3, 8, 0, '', ['bss-r', 'rev-lunge-r', 'bw-split-squat', 'step-up-r']),
+        it('leg-ext', 3, 12, 0, '', ['sl-leg-ext']),
+        it('machine-press-r', 3, 10, 0, '', ['db-bench-r', 'landmine-r', 'pec-deck-r']),
+        it('lat-raise-r', 3, 12, 0, '', ['machine-lat-r', 'cable-lat-r']),
+        it('pushdown-r', 3, 12, 0, '', ['kickback-r', 'tri-machine-r'])
       ]
     },
     {
-      id: 'upper', name: 'Upper (right arm + core)', weekdays: [2],
-      focus: 'Right-side work is intentional (cross-education). Left arm stays at ROM / under the cap and does not brace or grip.',
+      id: 'hams-pull', name: 'Hams + Pull', weekdays: [2],
+      focus: 'Hamstring and hinge work, plus a short right-arm pull block. Left arm stays unloaded and does not brace or grip.',
       items: [
-        it('machine-press-r', 3, 10, 0, '', ['db-bench-r', 'landmine-r', 'pec-deck-r']),
+        it('seated-curl', 3, 12, 0, '', ['lying-curl', 'sl-curl']),
+        it('sl-rdl-r', 3, 8, 0, '8/leg. Dumbbell in the right hand only.', ['back-ext', 'reverse-hyper']),
+        it('back-ext', 3, 10, 0, "Arms across the chest. Don't push off with the left getting in or out.", ['reverse-hyper', 'sl-rdl-r']),
+        it('sl-curl', 3, 10, 0, '10/leg.', ['lying-curl', 'seated-curl', 'nordic-curl']),
         it('cs-row-r', 3, 10, 0, '', ['cable-row-r', 'machine-row-r']),
+        it('rear-delt-r', 3, 12, 0, '', ['cable-row-r']),
+        it('curl-r', 3, 10, 0, '', ['cable-curl-r', 'preacher-r'])
+      ]
+    },
+    {
+      id: 'glutes-push', name: 'Glutes + Push', weekdays: [4],
+      focus: 'Glute-focused hip work, then the same right-arm press block as Monday. Left hand stays off handles and pads.',
+      items: [
+        it('hip-thrust-machine', 3, 10, 0, 'Belt or pad over the hips. Left hand off the handles.', ['glute-bridge', 'sl-glute-bridge']),
+        it('bss-r', 3, 8, 0, '8/leg. Weight in the right hand only.', ['step-up-r', 'walk-lunge-r', 'rev-lunge-r']),
+        it('glute-kick', 3, 12, 0, 'Chest pad only. Left arm relaxed, not bracing.', ['cable-kickback', 'cable-abd']),
+        it('hip-abd', 3, 12, 0, '', ['cable-abd', 'hip-add']),
+        it('machine-press-r', 3, 10, 0, '', ['db-bench-r', 'landmine-r', 'pec-deck-r']),
         it('lat-raise-r', 3, 12, 0, '', ['machine-lat-r', 'cable-lat-r']),
         it('pushdown-r', 3, 12, 0, '', ['kickback-r', 'tri-machine-r']),
+        it('incline-walk', 1, 1, 10, 'Optional 8–10 min hands-free finisher. No gripping the rails with the left.', ['bike', 'recumbent'])
+      ]
+    },
+    {
+      id: 'quads-hams-pull', name: 'Quads & Hams + Pull', weekdays: [5],
+      focus: 'Moderate quad and hamstring volume, a short right-arm pull block, and core. Not another heavy squat day. Same left-arm rules.',
+      items: [
+        it('hack-squat', 3, 12, 0, "Back on the pad. Don't hang on the left handle.", ['belt-squat', 'leg-press', 'v-squat']),
+        it('sl-leg-press', 2, 10, 0, '10/leg. Left arm in your lap, not on the handles.', ['rev-lunge-r', 'bss-r', 'leg-press']),
+        it('lying-curl', 3, 12, 0, 'Controlled reps. No left-hand gripping.', ['seated-curl', 'sl-curl', 'nordic-curl']),
+        it('seated-calf', 3, 12, 0, '', ['lp-calf', 'standing-calf']),
+        it('cs-row-r', 3, 10, 0, '', ['cable-row-r', 'machine-row-r']),
         it('curl-r', 3, 10, 0, '', ['cable-curl-r', 'preacher-r']),
-        it('pallof-r', 3, 10, 0, '', ['dead-bug', 'suitcase-hold-r']),
-        it('bench-leg-raise', 3, 10, 0, '', ['cable-crunch', 'decline-situp', 'machine-crunch'])
-      ]
-    },
-    {
-      id: 'legs-b', name: 'Legs B', weekdays: [4],
-      focus: 'Quad- and hinge-friendly machines, plus hips and calves. Same left-arm rules as Legs A.',
-      items: [
-        it('hack-squat', 3, 10, 0, '', ['belt-squat', 'leg-press']),
-        it('leg-ext', 3, 12, 0, '', ['sl-leg-ext']),
-        it('sl-leg-press', 3, 10, 0, '10/leg. Left arm in your lap, not on the handles.', ['rev-lunge-r', 'bss-r']),
-        it('seated-curl', 3, 12, 0, 'Controlled reps. No left-hand gripping.', ['lying-curl', 'sl-curl']),
-        it('hip-abd', 2, 12, 0, '', ['hip-add', 'cable-abd']),
-        it('standing-calf', 3, 12, 0, '', ['lp-calf', 'seated-calf']),
-        it('bike', 1, 1, 12, 'Optional 10–15 min finisher. No leaning or hanging on the left arm.', ['incline-walk', 'recumbent'])
-      ]
-    },
-    {
-      id: 'cond', name: 'Conditioning + core', weekdays: [5],
-      focus: "Hands-free cardio plus core that never loads or braces on the left arm. Don't lean or hang on rails or bars with the left.",
-      items: [
-        it('bike', 1, 1, 30, '', ['incline-walk', 'stairs', 'recumbent']),
-        it('dead-bug', 3, 8, 0, '', ['heel-taps', 'decline-situp']),
-        it('pallof-r', 3, 10, 0, '', ['suitcase-hold-r', 'dead-bug']),
-        it('bench-leg-raise', 3, 10, 0, 'Default core finisher. Right hand may lightly hold the bench; left stays off and unloaded.', ['cable-crunch', 'decline-situp', 'machine-crunch'])
+        it('dead-bug', 2, 8, 0, '', ['heel-taps', 'bench-leg-raise', 'pallof-r']),
+        it('bike', 1, 1, 10, 'Optional 8–12 min hands-free finisher. No leaning or hanging on the left arm.', ['incline-walk', 'recumbent'])
       ]
     }
   ];
@@ -168,6 +180,7 @@ window.SEED = (function () {
     ],
     useThese: [
       'Belt squat, hack squat, leg press, leg extension and curl, calf machines',
+      'Hip thrust machine, glute kickback, hip abduction, glute bridges',
       'Single-leg work with a DB in the right hand, or no load',
       'Right-arm only press, row, raise, curl, and landmine',
       'Dead bugs, cautious right-hand Pallof, decline sit-ups, bench leg raises',

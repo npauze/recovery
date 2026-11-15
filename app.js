@@ -474,11 +474,12 @@
       var sg = suggestFor(en.ex, it, l.whoop || 'green', iso, n);
       var prs = [];
       entryPRs(en, iso).forEach(function (p) { p.forEach(function (x) { if (prs.indexOf(x.label) < 0) prs.push(x.label); }); });
+      var vs = ds.length ? (C.vsTarget(en.kind, ds, sg) || 'hit') : 'missed';
       exercises.push({
         name: ex.name, kind: en.kind,
         setsLine: C.formatSets(en.kind, ds),
-        targetLine: C.formatTarget(en.kind, sg),
-        vs: ds.length ? (C.vsTarget(en.kind, ds, sg) || 'hit') : 'missed',
+        targetLine: vs === 'baseline' ? '' : C.formatTarget(en.kind, sg),
+        vs: vs,
         prs: prs, pain: !!en.pain, notes: (en.notes || '').trim()
       });
       if (ds.length) nexts.push(C.compactTarget(ex.name, en.kind, suggestFor(en.ex, it, 'green', addDays(iso, 1), n)));

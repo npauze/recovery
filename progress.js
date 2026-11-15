@@ -15,6 +15,10 @@
   // ~10% lighter, rounded to the exercise's weight step, and always actually lighter
   function deload(w, inc) { var st = inc > 0 ? inc : 2.5; var x = Math.round(w * 0.9 / st) * st; if (x >= w) x = w - st; return Math.max(0, r2(x)); }
   function clamp(v, a, b) { return Math.min(b, Math.max(a, v)); }
+  function midRange(rmin, rmax) { return Math.round((rmin + rmax) / 2); }
+  // Overshoot retune: 2.5 lb for DB/cable-style steps, otherwise 5 lb machines/barbell. Never round up.
+  function retuneStep(c, inc) { if (c && c.retuneInc) return c.retuneInc; return (inc > 0 && inc <= 2.5) ? 2.5 : 5; }
+  function floorInc(w, st) { st = st > 0 ? st : 5; return Math.max(0, r2(Math.floor((w + 1e-9) / st) * st)); }
 
   /* o: { kind: 'lb'|'none'|'min', hist: [{date, sets:[done sets], pain}] most recent first,
           cfg: {rmin, rmax, inc, minInc, lvInc}, item: {sets, reps, load}, nSets, whoop,
@@ -77,7 +81,29 @@
     else if (whoop === 'yellow') { res.action = 'repeat'; res.label = 'Repeat last'; res.tone = 'warn'; res.reps = fill(lastR); res.why = 'Whoop yellow: match last time, no increases. Leave 2\u20133 reps in the tank.'; }
     else {
       var allTop = lr.every(function (r) { return r >= rmax; }), missed = lr.some(function (r) { return r < rmin; });
-      if (allTop && k === 'none') {
+      var mid = midRange(rmin, rmax);
+      // Big overshoot: any working set beats the top of the range by 3+ (includes a first
+      // baseline session that landed well outside the intended range). Near-top first
+      // sessions stay on normal double progression.
+      var over = k === 'lb' && Wt > 0 && lr.some(function (r) { return r >= rmax + 3; });
+      if (over && ws.length) {
+        var bestE = 0;
+        ws.forEach(function (s) { var e = epley(W(s), R(s)); if (e > bestE) bestE = e; });
+        var uncapped = floorInc(bestE / (1 + (mid + 2) / 30), retuneStep(c, inc));
+        var nw = capW(uncapped);
+        res.w = nw;
+        res.reps = fill(mid);
+        if (lh && uncapped > cap) {
+          res.action = 'cap'; res.label = 'At cap'; res.tone = 'warn';
+          res.why = 'You\u2019re at your ' + cap + ' lb left-arm cap. No more weight until your surgeon clears it.';
+        } else {
+          var jump = r2(nw - Wt);
+          res.action = 'retune';
+          res.label = jump > 0 ? '+' + jump + ' lb (retune)' : (jump < 0 ? jump + ' lb (retune)' : 'Mid-range');
+          res.tone = 'ok';
+          res.why = 'Last time went well past the ' + rmin + '\u2013' + rmax + ' range. New weight is estimated to land around ' + mid + ' reps at about RPE 8.';
+        }
+      } else if (allTop && k === 'none') {
         res.action = 'sets'; res.label = 'Top of range'; res.tone = 'ok'; res.reps = fill(rmax);
         res.why = 'You hit ' + rmax + ' on every set. Add a set or slow the lowering to 3 seconds.';
       } else if (allTop) {
@@ -150,6 +176,6 @@
     return epley(W(s), R(s)) > epley(W(l), R(l)) ? 1 : -1;
   }
 
-  var api = { suggest: suggest, detectPRs: detectPRs, epley: epley, working: working, vol: vol, deload: deload, beat: beat };
+  var api = { suggest: suggest, detectPRs: detectPRs, epley: epley, working: working, vol: vol, deload: deload, beat: beat, midRange: midRange, floorInc: floorInc };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.PROG = api;
 })(this);

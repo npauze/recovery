@@ -42,8 +42,19 @@
   }
 
   // Compare done sets to the session target. Short a set, or any set under target weight/reps, is a miss.
+  // First session / unset 0 lb target is a baseline, never a miss.
+  function isBaseline(kind, sg) {
+    if (!sg) return false;
+    if (kind === 'min') return false;
+    // action 'start' or last === null is an explicit first session (suggest always sets last).
+    // A 0 / unset target weight is also a baseline. Don't treat a missing last field as no history.
+    if (sg.action === 'start' || sg.last === null) return true;
+    if (kind === 'lb' && !(+sg.w)) return true;
+    return false;
+  }
   function vsTarget(kind, sets, sg) {
     if (!sg || !sets || !sets.length) return null;
+    if (isBaseline(kind, sg)) return 'baseline';
     var n = kind === 'min' ? 1 : ((sg.reps && sg.reps.length) || 0);
     if (kind === 'min') {
       var m = +sets[0].w || 0;
@@ -74,9 +85,11 @@
     else lines.push('Last session: none (first one logged)');
     lines.push('');
     (o.exercises || []).forEach(function (ex) {
-      lines.push(ex.name + ' — ' + (ex.vs || 'hit'));
+      var vs = ex.vs || 'hit';
+      if (vs === 'baseline') vs = 'baseline set';
+      lines.push(ex.name + ' — ' + vs);
       if (ex.setsLine) lines.push('  ' + ex.setsLine);
-      if (ex.targetLine) lines.push('  Target was ' + ex.targetLine);
+      if (ex.targetLine && vs !== 'baseline set') lines.push('  Target was ' + ex.targetLine);
       if (ex.prs && ex.prs.length) lines.push('  PR: ' + ex.prs.join(', '));
       if (ex.pain) lines.push('  Pain flagged');
       if (ex.notes) lines.push('  Note: ' + ex.notes);
@@ -123,6 +136,6 @@
     return lines.join('\n').trim() + '\n';
   }
 
-  var api = { formatSets: formatSets, formatTarget: formatTarget, compactTarget: compactTarget, vsTarget: vsTarget, formatWorkout: formatWorkout, formatWeekly: formatWeekly };
+  var api = { formatSets: formatSets, formatTarget: formatTarget, compactTarget: compactTarget, vsTarget: vsTarget, isBaseline: isBaseline, formatWorkout: formatWorkout, formatWeekly: formatWeekly };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.COACH = api;
 })(this);

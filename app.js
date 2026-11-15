@@ -32,10 +32,10 @@
 
   // ---------- state ----------
   var P = window.PROG;
-  var SCHEMA = 3;
+  var SCHEMA = 4;
   function seedDays() {
     return SEED.days.map(function (d) {
-      return { id: d.id, name: d.name, focus: d.focus, weekdays: d.weekdays.slice(), items: d.items.map(function (it) { var x = clone(it); x.id = uid(); return x; }) };
+      return { id: d.id, name: d.name, focus: d.focus, weekdays: [], items: d.items.map(function (it) { var x = clone(it); x.id = uid(); return x; }) };
     });
   }
   function seedLibrary() { return clone(SEED.library).map(function (x) { if (x.leftHold == null) x.leftHold = x.safety === 'avoid'; return x; }); }
@@ -73,7 +73,11 @@
     b.library.forEach(function (x) { if (!have[x.id]) s.library.push(x); });
     s.library.forEach(function (x) { if (x.leftHold == null) x.leftHold = x.safety === 'avoid'; });
     if (!Array.isArray(s.days) || from < 3) s.days = b.days;
-    s.days.forEach(function (d) { d.weekdays = Array.isArray(d.weekdays) ? d.weekdays : []; d.items = Array.isArray(d.items) ? d.items : []; d.items.forEach(function (it) { if (!it.id) it.id = uid(); }); });
+    s.days.forEach(function (d) {
+      d.weekdays = from < 4 ? [] : (Array.isArray(d.weekdays) ? d.weekdays : []);
+      d.items = Array.isArray(d.items) ? d.items : [];
+      d.items.forEach(function (it) { if (!it.id) it.id = uid(); });
+    });
     s.exCfg = s.exCfg && typeof s.exCfg === 'object' ? s.exCfg : {};
     s.logs = s.logs && typeof s.logs === 'object' ? s.logs : {};
     Object.keys(s.logs).forEach(function (k) {
@@ -123,17 +127,11 @@
     return e || { id: id, name: (fallback && fallback.name) || 'Removed exercise', kind: (fallback && fallback.kind) || 'lb', safety: 'caution', notes: '', cat: 'other' };
   }
   function badge(s) { var b = SAFETY[s] || SAFETY.caution; return '<span class="badge ' + b.cls + '">' + b.label + '</span>'; }
-  function scheduledDay(iso) {
-    var wd = parse(iso).getDay();
-    for (var i = 0; i < state.days.length; i++) if (state.days[i].weekdays.indexOf(wd) >= 0) return state.days[i];
-    return null;
-  }
   function sessionDayId(iso) {
     var l = state.logs[iso];
     if (l && l.dayId) return l.dayId;
-    if (l && l.builtFor && l.entries.some(function (e) { return e.touched; })) return l.builtFor;
-    var d = scheduledDay(iso);
-    return d ? d.id : 'rest';
+    if (l && l.builtFor && (l.entries || []).some(function (e) { return e.touched; })) return l.builtFor;
+    return 'pick';
   }
   function getLog(iso) {
     var l = state.logs[iso];
@@ -216,7 +214,6 @@
   function weekStats(iso) {
     var a = weekStart(iso), b = addDays(a, 6), pa = addDays(a, -7);
     var o = { start: a, vol: 0, volPrev: 0, prs: 0, sessions: 0, rom: 0, planned: 0, romTarget: (state.settings.romTarget || 3) * 7 };
-    state.days.forEach(function (d) { o.planned += d.weekdays.length; });
     Object.keys(state.logs).forEach(function (k) {
       var l = state.logs[k], inW = k >= a && k <= b, inP = k >= pa && k < a;
       if (!inW && !inP) return;
@@ -257,7 +254,7 @@
   function sigOf(d, whoop) { return whoop + '|' + JSON.stringify(d.items.map(function (i) { return [i.id, i.ex, i.sets, i.reps, i.load, i.note]; })); }
   function ensureSession(iso) {
     var dayId = sessionDayId(iso);
-    if (dayId === 'rest') return null;
+    if (dayId === 'rest' || dayId === 'pick') return null;
     var d = day(dayId), l = getLog(iso);
     if (!d) return l.entries.length ? l : null;
     var sig = sigOf(d, l.whoop);
@@ -376,9 +373,82 @@
     var dv = w.volPrev ? Math.round((w.vol - w.volPrev) / w.volPrev * 100) : null;
     return '<div class="wk"><div><b>' + fmtNum(w.vol) + '</b><span>lb volume' + (dv == null ? '' : ' <em class="' + (dv >= 0 ? 'up' : 'down') + '">' + (dv >= 0 ? '+' : '') + dv + '%</em>') + '</span></div>' +
       '<div><b>' + w.prs + '</b><span>PRs</span></div>' +
-      '<div><b>' + w.sessions + '/' + w.planned + '</b><span>Sessions</span></div>' +
+      '<div><b>' + w.sessions + '</b><span>Sessions</span></div>' +
       '<div><b>' + w.rom + '/' + w.romTarget + '</b><span>ROM</span></div></div>' +
       '<p class="small muted wk-cap">Week of ' + fmt(w.start, { month: 'short', day: 'numeric' }) + (w.volPrev ? ' · last week ' + fmtNum(w.volPrev) + ' lb' : '') + '</p>';
+  }
+
+
+  function fmtShort(iso) {
+    var d = parse(iso);
+    return WD[d.getDay()] + ' ' + d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }
+  function ago(iso, from) {
+    var n = diff(iso, from || todayKey());
+    if (n === 0) return 'today';
+    if (n === 1) return '1 day ago';
+    if (n > 1) return n + ' days ago';
+    if (n === -1) return 'tomorrow';
+    return 'in ' + (-n) + ' days';
+  }
+  function sessionDone(l) {
+    return !!(l && (l.entries || []).some(function (e) { return doneSets(e).length; }));
+  }
+  function workoutIdOf(l) {
+    if (!l) return null;
+    var id = l.dayId || l.builtFor;
+    if (!id || id === 'rest' || id === 'pick') return null;
+    return id;
+  }
+  function lastCompleted(dayId, beforeIso) {
+    var last = null;
+    Object.keys(state.logs).forEach(function (k) {
+      if (beforeIso && k >= beforeIso) return;
+      var l = state.logs[k];
+      if (workoutIdOf(l) !== dayId || !sessionDone(l)) return;
+      if (!last || k > last) last = k;
+    });
+    return last;
+  }
+  function nextUp(beforeIso) {
+    var best = null, bestDate = null, bestIdx = 999;
+    state.days.forEach(function (d, i) {
+      var last = lastCompleted(d.id, beforeIso);
+      var key = last || '';
+      if (best == null || key < bestDate || (key === bestDate && i < bestIdx)) {
+        best = d.id; bestDate = key; bestIdx = i;
+      }
+    });
+    return best;
+  }
+  function recentWorkouts(upToIso, limit) {
+    limit = limit || 5;
+    var out = [];
+    Object.keys(state.logs).sort().reverse().forEach(function (k) {
+      if (upToIso && k > upToIso) return;
+      var l = state.logs[k];
+      var id = workoutIdOf(l);
+      if (!id || !sessionDone(l)) return;
+      var entries = (l.entries || []).filter(function (e) { return doneSets(e).length; });
+      var nsets = entries.reduce(function (a, e) { return a + doneSets(e).length; }, 0);
+      var vol = entries.reduce(function (a, e) { return a + (e.kind === 'lb' ? P.vol(doneSets(e), 'lb') : 0); }, 0);
+      var d = day(id);
+      var top = null;
+      entries.forEach(function (e) {
+        if (e.kind !== 'lb') return;
+        doneSets(e).forEach(function (s) {
+          if (!top || s.w > top.w || (s.w === top.w && s.r > top.r)) top = { name: exInfo(e.ex, e).name, w: s.w, r: s.r };
+        });
+      });
+      out.push({ date: k, dayId: id, name: (d && d.name) || 'Workout', nsets: nsets, nex: entries.length, vol: vol, top: top, whoop: l.whoop || 'green' });
+    });
+    return out.slice(0, limit);
+  }
+  function recentSummary(r) {
+    var parts = [r.nsets + (r.nsets === 1 ? ' set' : ' sets')];
+    if (r.vol) parts.push(fmtNum(r.vol) + ' lb');
+    if (r.top) parts.push(r.top.name + ' ' + r.top.w + '\u00d7' + r.top.r);
+    return parts.join(' \u00b7 ');
   }
 
   // ---------- views ----------
@@ -389,7 +459,8 @@
     var existing = state.logs[iso];
     var whoop = (existing && existing.whoop) || 'green';
     var dayId = sessionDayId(iso);
-    var sched = scheduledDay(iso);
+    if (dayId !== 'rest' && dayId !== 'pick' && !day(dayId)) dayId = 'pick';
+    var picking = !!ui.picking || dayId === 'pick';
     var h = '';
     h += '<div class="datebar"><button class="btn icon" data-act="date" data-n="-1" aria-label="Previous day">‹</button><div class="d">' +
       (iso === t ? 'Today · ' : '') + fmt(iso) + (iso !== t ? ' <button class="btn sm ghost" data-act="date" data-n="0">Go to today</button>' : '') +
@@ -401,35 +472,57 @@
     if (toChk <= 0) h += '<div class="callout warn"><b>Checkup date reached</b>Keep the ' + s.cap + ' lb cap until you apply what was cleared. Update limits under More.</div>';
     h += '<div class="callout bad"><b>Left arm: pain-free ROM, ≤ ' + s.cap + ' lb</b>No gripping, pushing, pulling, bracing, or hanging with the left. Stop and call your surgeon for sharp pain, a pop, new swelling, or numbness. <a href="#" data-act="tab" data-t="rehab">Rehab details</a></div>';
 
-    h += '<h2>Whoop recovery</h2><div class="seg">' + ['green', 'yellow', 'red'].map(function (w) {
-      return '<button class="' + w[0] + (whoop === w ? ' on' : '') + '" data-act="whoop" data-w="' + w + '">' + w[0].toUpperCase() + w.slice(1) + '</button>';
-    }).join('') + '</div><div class="callout ' + WHOOP[whoop].tone + '"><b>' + WHOOP[whoop].lead + '</b>' + WHOOP[whoop].body + '</div>';
+    var rec = recentWorkouts(iso, 5);
+    h += '<h2>Recent workouts</h2>';
+    if (!rec.length) h += '<div class="card"><p class="muted">No workouts logged yet. When you finish a session, it shows up here.</p></div>';
+    else h += rec.map(function (r) {
+      return '<button class="recent-card" data-act="recent" data-k="' + esc(r.date) + '"><div class="grow"><div class="nm">' + esc(r.name) + '</div>' +
+        '<div class="muted small">' + esc(fmtShort(r.date)) + ' \u00b7 ' + esc(ago(r.date, iso)) + '</div>' +
+        '<div class="muted small">' + esc(recentSummary(r)) + '</div></div><span class="muted">\u203a</span></button>';
+    }).join('');
 
-    // rehab check-off
+    if (picking) {
+      var nxt = nextUp(iso), nd = nxt ? day(nxt) : null;
+      h += '<h2>Choose a workout</h2>';
+      if (nd) h += '<p class="muted small">Next up: <b>' + esc(nd.name) + '</b> (done least recently). Pick any workout you want.</p>';
+      h += '<div class="pick-grid">';
+      state.days.forEach(function (d) {
+        var last = lastCompleted(d.id, iso);
+        var isNext = d.id === nxt;
+        var sub = last ? 'Last: ' + fmtShort(last) + ' \u00b7 ' + ago(last, iso) : 'Not done yet';
+        h += '<button type="button" class="workout-card' + (isNext ? ' next' : '') + '" data-act="pickwo" data-d="' + esc(d.id) + '"' + (isNext ? ' data-next="1"' : '') + '>' +
+          '<div class="row between"><div class="nm">' + esc(d.name) + '</div>' + (isNext ? '<span class="tag ok">Next up</span>' : '') + '</div>' +
+          '<div class="muted small">' + d.items.length + ' exercises \u00b7 ' + esc(sub) + '</div></button>';
+      });
+      h += '<button type="button" class="workout-card rest" data-act="pickwo" data-d="rest"><div class="nm">Rest / ROM day</div>' +
+        '<div class="muted small">No lifting. Optional easy walk or hands-free bike, plus your ROM sessions.</div></button>';
+      if (ui.picking && dayId !== 'pick') h += '<button type="button" class="btn ghost block" data-act="pickcancel">Keep current workout</button>';
+      h += '</div>';
+    } else if (dayId === 'rest') {
+      h += '<div class="card"><h3>Rest / ROM day</h3><p class="muted">Optional easy walk or hands-free bike, plus your ROM sessions below. No lifting needed.</p>' +
+        '<button class="btn sm" data-act="changewo">Choose a workout instead</button></div>';
+    } else {
+      h += '<h2>Whoop recovery</h2><div class="seg">' + ['green', 'yellow', 'red'].map(function (w) {
+        return '<button class="' + w[0] + (whoop === w ? ' on' : '') + '" data-act="whoop" data-w="' + w + '">' + w[0].toUpperCase() + w.slice(1) + '</button>';
+      }).join('') + '</div><div class="callout ' + WHOOP[whoop].tone + '"><b>' + WHOOP[whoop].lead + '</b>' + WHOOP[whoop].body + '</div>';
+      var l = ensureSession(iso), d = day(dayId) || { name: 'Deleted session', focus: '' };
+      if (!l) h += '<div class="card"><p class="muted">This session no longer exists. <button class="btn sm" data-act="changewo">Pick a workout</button></p></div>';
+      else {
+        var exDone = l.entries.filter(function (e) { return e.sets.length && doneSets(e).length === e.sets.length; }).length;
+        h += '<div class="card"><div class="row between"><h3>' + esc(d.name) + '</h3><span class="muted small">' + exDone + '/' + l.entries.length + ' done</span></div><p class="muted small">' + esc(d.focus || '') + '</p>' +
+          '<div class="row wrap" style="margin-top:8px"><button class="btn sm" data-act="addentry">+ Exercise today</button><button class="btn sm ghost" data-act="rebuild">Reset session</button><span class="grow"></span><button class="btn sm" data-act="changewo">Change workout</button></div></div>';
+        h += l.entries.map(function (en, ei) { return entryCard(en, ei, iso, l); }).join('');
+      }
+    }
+
     var rom = (existing && existing.rom) || 0, tgt = s.romTarget || 3, hab = (existing && existing.habits) || {};
     var dots = ''; for (var i = 0; i < Math.max(tgt, rom); i++) dots += '<i class="' + (i < rom ? 'on' : '') + '"></i>';
-    h += '<h2>Rehab today</h2><div class="card"><div class="row between"><div><b>Left-arm ROM</b><div class="muted small">' + rom + ' of ' + tgt + ' sessions · 5–10 min, pain-free</div></div><div class="rom-dots">' + dots + '</div></div>' +
+    h += '<h2>Rehab today</h2><div class="card"><div class="row between"><div><b>Left-arm ROM</b><div class="muted small">' + rom + ' of ' + tgt + ' sessions \u00b7 5\u201310 min, pain-free</div></div><div class="rom-dots">' + dots + '</div></div>' +
       '<div class="row" style="margin-top:10px"><button class="btn pri grow" data-act="rom" data-n="1">+ Did a ROM session</button><button class="btn" data-act="rom" data-n="-1"' + (rom ? '' : ' disabled') + ' aria-label="Undo ROM session">Undo</button></div>' +
       '<p class="small muted" style="margin-top:8px">ROM is never progressed in load. Go by comfort: a little more range, less stiffness, no pain.</p>' +
-      '<div class="chips" style="margin-top:10px">' + R.habits.map(function (x) { return '<button class="chip' + (hab[x[0]] ? ' on' : '') + '" data-act="habit" data-k="' + x[0] + '">' + (hab[x[0]] ? '✓ ' : '') + esc(x[1]) + '</button>'; }).join('') + '</div></div>';
-
-    // session
-    var opts = state.days.map(function (d) { return '<option value="' + esc(d.id) + '"' + (d.id === dayId ? ' selected' : '') + '>' + esc(d.name) + '</option>'; }).join('') +
-      '<option value="rest"' + (dayId === 'rest' ? ' selected' : '') + '>Rest day</option>';
-    h += '<h2>Session</h2><label class="f" style="margin-top:0">Session for ' + WD[parse(iso).getDay()] + (sched ? ' (scheduled: ' + esc(sched.name) + ')' : ' (no session scheduled)') +
-      '<select data-field="pickday">' + opts + '</select></label>';
-    if (dayId === 'rest') {
-      h += '<div class="card"><h3>Rest day</h3><p class="muted">Optional easy walk or hands-free bike, plus your ROM sessions. No lifting needed. Pick a session above if you want to train.</p></div>';
-    } else {
-      var l = ensureSession(iso), d = day(dayId) || { name: 'Deleted session', focus: '' };
-      if (!l) return h + '<div class="card"><p class="muted">This session no longer exists. Pick another above.</p></div>';
-      var exDone = l.entries.filter(function (e) { return e.sets.length && doneSets(e).length === e.sets.length; }).length;
-      h += '<div class="card"><div class="row between"><h3>' + esc(d.name) + '</h3><span class="muted small">' + exDone + '/' + l.entries.length + ' done</span></div><p class="muted small">' + esc(d.focus || '') + '</p>' +
-        '<div class="row" style="margin-top:8px"><button class="btn sm" data-act="addentry">+ Exercise today</button><button class="btn sm ghost" data-act="rebuild">Reset session</button></div></div>';
-      h += l.entries.map(function (en, ei) { return entryCard(en, ei, iso, l); }).join('');
-    }
+      '<div class="chips" style="margin-top:10px">' + R.habits.map(function (x) { return '<button class="chip' + (hab[x[0]] ? ' on' : '') + '" data-act="habit" data-k="' + x[0] + '">' + (hab[x[0]] ? '\u2713 ' : '') + esc(x[1]) + '</button>'; }).join('') + '</div></div>';
     var note = (existing && existing.note) || '';
-    h += '<h2>Day notes</h2><textarea rows="2" placeholder="Arm feel, swelling, sleep, anything to tell the surgeon…" data-field="dnote">' + esc(note) + '</textarea>';
+    h += '<h2>Day notes</h2><textarea rows="2" placeholder="Arm feel, swelling, sleep, anything to tell the surgeon\u2026" data-field="dnote">' + esc(note) + '</textarea>';
     return h;
   }
 
@@ -438,17 +531,13 @@
       '<input inputmode="decimal" data-field="pnum" data-k="' + act + '" data-d="' + esc(d) + '" data-i="' + i + '" value="' + esc(val) + '"><button data-act="' + act + '" data-dir="1" data-d="' + esc(d) + '" data-i="' + i + '">+</button></div>';
   }
   function vProgram() {
-    var h = '<p class="muted small">Your week. Tap weekdays to schedule, Edit to change exercises. Changes save automatically and apply to new sessions.</p>';
-    var count = {}; state.days.forEach(function (d) { d.weekdays.forEach(function (w) { count[w] = (count[w] || 0) + 1; }); });
-    var dup = Object.keys(count).filter(function (k) { return count[k] > 1; }).map(function (k) { return WD[k]; });
-    if (dup.length) h += '<div class="callout warn">' + dup.join(', ') + ' has more than one session. Today uses the first one in the list.</div>';
+    var h = '<p class="muted small">Your workouts. Edit exercises here. On Today, pick the one you\u2019re doing \u2014 they are not tied to a weekday. Changes save automatically and apply to new sessions.</p>';
     state.days.forEach(function (d, di) {
       var open = ui.editDay === d.id;
       h += '<div class="card"><div class="row"><div class="grow"><h3>' + esc(d.name) + '</h3><div class="muted small">' + d.items.length + ' exercises</div></div>' +
         '<button class="btn icon sm" data-act="dmove" data-d="' + esc(d.id) + '" data-dir="-1"' + (di === 0 ? ' disabled' : '') + ' aria-label="Move up">↑</button>' +
         '<button class="btn icon sm" data-act="dmove" data-d="' + esc(d.id) + '" data-dir="1"' + (di === state.days.length - 1 ? ' disabled' : '') + ' aria-label="Move down">↓</button>' +
-        '<button class="btn sm' + (open ? ' pri' : '') + '" data-act="dedit" data-d="' + esc(d.id) + '">' + (open ? 'Done' : 'Edit') + '</button></div>' +
-        '<div class="chips wd" style="margin-top:10px">' + WD_ORDER.map(function (w) { return '<button class="chip' + (d.weekdays.indexOf(w) >= 0 ? ' on' : '') + '" data-act="wd" data-d="' + esc(d.id) + '" data-w="' + w + '">' + WD[w] + '</button>'; }).join('') + '</div>';
+        '<button class="btn sm' + (open ? ' pri' : '') + '" data-act="dedit" data-d="' + esc(d.id) + '">' + (open ? 'Done' : 'Edit') + '</button></div>';
       if (!open) {
         h += '<ul class="list" style="margin-top:8px">' + d.items.map(function (it) {
           var ex = exInfo(it.ex);
@@ -472,11 +561,11 @@
             '<span class="grow"></span><button class="btn sm ghost danger" data-act="idel" data-d="' + esc(d.id) + '" data-i="' + i + '">Remove</button></div></li>';
         }).join('') + '</ul>' +
           '<div class="row wrap" style="margin-top:10px"><button class="btn pri sm" data-act="padd" data-d="' + esc(d.id) + '">+ Add exercise</button><span class="grow"></span>' +
-          '<button class="btn sm ghost danger" data-act="ddel" data-d="' + esc(d.id) + '">Delete day</button></div>';
+          '<button class="btn sm ghost danger" data-act="ddel" data-d="' + esc(d.id) + '">Delete workout</button></div>';
       }
       h += '</div>';
     });
-    h += '<div class="row" style="margin-top:6px"><button class="btn block" data-act="dadd">+ Add training day</button></div>';
+    h += '<div class="row" style="margin-top:6px"><button class="btn block" data-act="dadd">+ Add workout</button></div>';
 
     // library
     h += '<h2>Exercise library</h2><div class="card">' +
@@ -646,11 +735,28 @@
     var root = $('#sheet-root'), sh = ui.sheet;
     if (!sh) { root.innerHTML = ''; document.body.style.overflow = ''; return; }
     document.body.style.overflow = 'hidden';
-    var body = sh.type === 'custom' ? customForm(sh) : sh.type === 'adjust' ? adjustSheet(sh) : pickList(sh);
+    var body = sh.type === 'custom' ? customForm(sh) : sh.type === 'adjust' ? adjustSheet(sh) : sh.type === 'recent' ? recentSheet(sh) : pickList(sh);
     var open = root.querySelector('.sheet');
     if (open && root.dataset.type === sh.type) { var sc = open.scrollTop; open.innerHTML = '<div class="grab"></div>' + body; open.scrollTop = sc; return; } // update in place, no re-animation
     root.dataset.type = sh.type;
     root.innerHTML = '<div class="scrim" data-act="close"></div><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>' + body + '</div>';
+  }
+  function recentSheet(sh) {
+    var k = sh.date, l = state.logs[k];
+    if (!l) return '<div class="sheet-head"><h3>Workout</h3><button class="btn sm" data-act="close">Close</button></div><p class="muted">No log for this day.</p>';
+    var id = workoutIdOf(l), d = id ? day(id) : null;
+    var entries = (l.entries || []).filter(function (e) { return doneSets(e).length || e.pain; });
+    var h = '<div class="sheet-head"><h3>' + esc((d && d.name) || 'Workout') + '</h3><button class="btn sm" data-act="close">Close</button></div>';
+    h += '<p class="muted small">' + esc(fmtShort(k)) + ' \u00b7 ' + esc(ago(k)) + (l.whoop ? ' \u00b7 ' + l.whoop : '') + '</p>';
+    if (!entries.length) h += '<p class="muted">No sets logged.</p>';
+    else h += '<ul class="list">' + entries.map(function (e) {
+      return '<li><b>' + esc(exInfo(e.ex, e).name) + '</b>' + (e.pain ? ' <span class="badge bad">Pain</span>' : '') +
+        '<div class="muted small">' + esc(setsText(doneSets(e), e.kind)) + '</div>' +
+        (e.notes ? '<div class="small">' + esc(e.notes) + '</div>' : '') + '</li>';
+    }).join('') + '</ul>';
+    if (l.note) h += '<p class="small"><b>Note:</b> ' + esc(l.note) + '</p>';
+    h += '<button class="btn block" style="margin-top:12px" data-act="openday" data-k="' + esc(k) + '">Open this day</button>';
+    return h;
   }
   function pickList(sh) {
     var current = sh.current ? exInfo(sh.current) : null;
@@ -803,7 +909,7 @@
     var l, en, d, it, i;
     switch (a) {
       case 'tab': ui.tab = D.t; render(); window.scrollTo(0, 0); return;
-      case 'date': ui.date = D.n === '0' ? todayKey() : addDays(ui.date, +D.n); render(); return;
+      case 'date': ui.date = D.n === '0' ? todayKey() : addDays(ui.date, +D.n); ui.picking = false; render(); return;
       case 'whoop': applyWhoop(ui.date, D.w); render(); return;
       case 'rom': {
         var iso = D.today ? todayKey() : ui.date;
@@ -898,11 +1004,24 @@
         if (then) { ui.sheet = then; doPick(x.id); } else { closeSheet(); toast('Saved to library'); render(); }
         return;
       }
+      case 'pickwo': {
+        l = getLog(ui.date);
+        var hasWork = (l.entries || []).some(function (x) { return doneSets(x).length; });
+        var cur = l.dayId || l.builtFor;
+        if (hasWork && cur && cur !== D.d && !confirm('Switch workout? Sets you logged for this day will be replaced.')) return;
+        ui.picking = false;
+        l.dayId = D.d; l.builtFor = null; l.entries = []; l.sig = '';
+        save();
+        if (D.d !== 'rest') ensureSession(ui.date);
+        render(); return;
+      }
+      case 'changewo': ui.picking = true; render(); return;
+      case 'pickcancel': ui.picking = false; render(); return;
+      case 'recent': openSheet({ type: 'recent', date: D.k }); return;
       // program
       case 'dedit': ui.editDay = ui.editDay === D.d ? null : D.d; render(); return;
-      case 'wd': d = day(D.d); var w = +D.w, k = d.weekdays.indexOf(w); if (k >= 0) d.weekdays.splice(k, 1); else d.weekdays.push(w); save(); render(); return;
       case 'dmove': i = state.days.indexOf(day(D.d)); var j = i + (+D.dir); if (j >= 0 && j < state.days.length) { var tmp = state.days[i]; state.days[i] = state.days[j]; state.days[j] = tmp; save(); render(); } return;
-      case 'dadd': { var nd = { id: 'd-' + uid(), name: 'New day', focus: '', weekdays: [], items: [] }; state.days.push(nd); ui.editDay = nd.id; save(); render(); return; }
+      case 'dadd': { var nd = { id: 'd-' + uid(), name: 'New workout', focus: '', weekdays: [], items: [] }; state.days.push(nd); ui.editDay = nd.id; save(); render(); return; }
       case 'ddel': d = day(D.d); if (confirm('Delete "' + d.name + '"? Past logs stay in History.')) { state.days.splice(state.days.indexOf(d), 1); ui.editDay = null; save(); render(); } return;
       case 'imove': d = day(D.d); i = +D.i; var j2 = i + (+D.dir); if (j2 >= 0 && j2 < d.items.length) { var t2 = d.items[i]; d.items[i] = d.items[j2]; d.items[j2] = t2; save(); render(); } return;
       case 'idel': d = day(D.d); d.items.splice(+D.i, 1); save(); render(); return;
@@ -922,7 +1041,7 @@
       case 'resetprog': if (confirm('Reset the program and library to the original plan? Your logs are kept.')) { var b = seedState(); state.days = b.days; state.library = b.library.concat(state.library.filter(function (z) { return z.custom; })); save(); render(); toast('Program reset'); } return;
       // history
       case 'hmet': ui.histMetric = D.m; render(); return;
-      case 'openday': ui.date = D.k; ui.tab = 'today'; render(); window.scrollTo(0, 0); return;
+      case 'openday': ui.date = D.k; ui.tab = 'today'; ui.picking = false; closeSheet(); render(); window.scrollTo(0, 0); return;
       // more
       case 'export': exportData(); return;
       case 'wipe': if (confirm('Erase all program, logs, and settings on this phone? Export a backup first if you want to keep them.')) { localStorage.removeItem(KEY); state = seedState(); save(); render(); toast('Reset to fresh'); } return;
@@ -1045,5 +1164,5 @@
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
     window.addEventListener('load', function () { navigator.serviceWorker.register('./service-worker.js').catch(function (e) { console.warn('SW', e); }); });
   }
-  window.__app = { get state() { return state; }, ui: ui, render: render, save: save, migrate: migrate, suggestFor: suggestFor, weekStats: weekStats, cfgOf: cfgOf };
+  window.__app = { get state() { return state; }, ui: ui, render: render, save: save, migrate: migrate, suggestFor: suggestFor, weekStats: weekStats, cfgOf: cfgOf, nextUp: nextUp, recentWorkouts: recentWorkouts, lastCompleted: lastCompleted };
 })();

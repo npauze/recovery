@@ -208,3 +208,23 @@ a { color: var(--acc); font-weight: 600; }
   .meta { padding-left: 20px; }
   .wk b { font-size: 15px; }
 }
+
+/* v4: workout picker + recent sessions */
+.pick-grid { display: flex; flex-direction: column; gap: 10px; margin: 8px 0 4px; }
+.workout-card, .recent-card {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+  color: var(--text); font: inherit; font-family: inherit; cursor: pointer;
+  padding: 14px 16px; min-height: 72px; touch-action: manipulation;
+}
+.workout-card { display: block; min-height: 76px; }
+.workout-card .nm, .recent-card .nm { font-weight: 800; font-size: 18px; line-height: 1.2; }
+.workout-card .muted, .recent-card .muted { margin-top: 3px; }
+.workout-card.next { border-color: var(--acc); box-shadow: 0 0 0 2px var(--acc-soft); }
+.workout-card.rest { background: var(--card2); min-height: 64px; }
+.workout-card:active, .recent-card:active { transform: scale(.99); }
+.recent-card { min-height: 64px; margin: 8px 0; }
+@media (max-width: 380px) {
+  .workout-card, .recent-card { padding: 12px 12px; }
+  .workout-card .nm, .recent-card .nm { font-size: 17px; }
+}

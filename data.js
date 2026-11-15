@@ -102,7 +102,7 @@ window.SEED = (function () {
 
   var days = [
     {
-      id: 'quads-push', name: 'Quads + Push', weekdays: [1],
+      id: 'quads-push', name: 'Quads + Push',
       focus: 'Quad-dominant machines and single-leg work, plus a short right-arm press block. Left arm stays in your lap or relaxed at your side.',
       items: [
         it('belt-squat', 3, 10, 0, '', ['hack-squat', 'leg-press', 'v-squat']),
@@ -115,7 +115,7 @@ window.SEED = (function () {
       ]
     },
     {
-      id: 'hams-pull', name: 'Hams + Pull', weekdays: [2],
+      id: 'hams-pull', name: 'Hams + Pull',
       focus: 'Hamstring and hinge work, plus a short right-arm pull block. Left arm stays unloaded and does not brace or grip.',
       items: [
         it('seated-curl', 3, 12, 0, '', ['lying-curl', 'sl-curl']),
@@ -128,8 +128,8 @@ window.SEED = (function () {
       ]
     },
     {
-      id: 'glutes-push', name: 'Glutes + Push', weekdays: [4],
-      focus: 'Glute-focused hip work, then the same right-arm press block as Monday. Left hand stays off handles and pads.',
+      id: 'glutes-push', name: 'Glutes + Push',
+      focus: 'Glute-focused hip work, then the same right-arm press block as Quads + Push. Left hand stays off handles and pads.',
       items: [
         it('hip-thrust-machine', 3, 10, 0, 'Belt or pad over the hips. Left hand off the handles.', ['glute-bridge', 'sl-glute-bridge']),
         it('bss-r', 3, 8, 0, '8/leg. Weight in the right hand only.', ['step-up-r', 'walk-lunge-r', 'rev-lunge-r']),
@@ -142,7 +142,7 @@ window.SEED = (function () {
       ]
     },
     {
-      id: 'quads-hams-pull', name: 'Quads & Hams + Pull', weekdays: [5],
+      id: 'quads-hams-pull', name: 'Quads & Hams + Pull',
       focus: 'Moderate quad and hamstring volume, a short right-arm pull block, and core. Not another heavy squat day. Same left-arm rules.',
       items: [
         it('hack-squat', 3, 12, 0, "Back on the pad. Don't hang on the left handle.", ['belt-squat', 'leg-press', 'v-squat']),

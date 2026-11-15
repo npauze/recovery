@@ -1,5 +1,5 @@
 /* Offline-first cache for the app shell. Bump VERSION when files change. */
-const VERSION = 'recovery-v3';
+const VERSION = 'recovery-v4';
 const ASSETS = [
   './', './index.html', './styles.css', './data.js', './progress.js', './app.js', './manifest.webmanifest',
   './icon-192.png', './icon-512.png', './apple-touch-icon.png'

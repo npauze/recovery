@@ -79,7 +79,31 @@
     else if (painLast) { res.action = 'pain'; res.label = 'Hold (pain)'; res.tone = 'bad'; res.reps = fill(lastR); res.why = PAIN_WHY; }
     else if (whoop === 'red') { res.action = 'red'; res.label = Wt > 0 ? 'Deload ~10%' : 'Easy day'; res.tone = 'bad'; res.w = Wt > 0 ? deload(Wt, inc) : 0; res.reps = fill(lastR); res.why = 'Whoop red: lighter, fewer sets, nothing to failure.'; }
     else if (whoop === 'yellow') { res.action = 'repeat'; res.label = 'Repeat last'; res.tone = 'warn'; res.reps = fill(lastR); res.why = 'Whoop yellow: match last time, no increases. Leave 2\u20133 reps in the tank.'; }
-    else {
+    else if (k === 'none') {
+      // Bodyweight: never drop reps below what he just did (pain/red already handled).
+      // Even out to the best set, then +1. At a high-rep ceiling, add challenge with
+      // tempo or a light plate in the RIGHT hand only — never a left-hand load.
+      var bestR = lr.length ? maxOf(lr, function (r) { return r; }) : rmin;
+      var allBest = lr.length && lr.every(function (r) { return r >= bestR; });
+      var ceil = Math.max(20, rmax + 5);
+      var TIP = 'Easy? Slow the lowering to 3 seconds, or hold a light plate with your RIGHT hand only.';
+      if (allRated && maxRpe >= 10) {
+        res.action = 'hold'; res.label = 'Repeat'; res.tone = 'warn'; res.reps = fill(lastR);
+        res.why = 'Last time was all-out (RPE 10). Match it with cleaner reps before adding.';
+      } else if (bestR < rmin) {
+        res.action = 'hold'; res.label = 'Hold'; res.tone = 'warn'; res.reps = fill(rmin);
+        res.why = 'Some sets fell short of ' + rmin + '. Aim for ' + rmin + '+ on every set.';
+      } else if (bestR >= ceil) {
+        res.action = 'tempo'; res.label = 'Add challenge'; res.tone = 'ok'; res.reps = fill(bestR);
+        res.why = 'You\u2019re at a solid rep count. ' + TIP;
+      } else if (!allBest) {
+        res.action = 'rep'; res.label = 'Match best'; res.tone = 'ok'; res.reps = fill(bestR);
+        res.why = 'Even out to your best set (' + bestR + ' reps) on every set.';
+      } else {
+        res.action = 'rep'; res.label = '+1 rep'; res.tone = 'ok'; res.reps = fill(bestR + 1);
+        res.why = 'Nice work. Add a rep on every set. Stay smooth and stop short of failure.';
+      }
+    } else {
       var allTop = lr.every(function (r) { return r >= rmax; }), missed = lr.some(function (r) { return r < rmin; });
       var mid = midRange(rmin, rmax);
       // Big overshoot: any working set beats the top of the range by 3+ (includes a first
@@ -103,9 +127,6 @@
           res.tone = 'ok';
           res.why = 'Last time went well past the ' + rmin + '\u2013' + rmax + ' range. New weight is estimated to land around ' + mid + ' reps at about RPE 8.';
         }
-      } else if (allTop && k === 'none') {
-        res.action = 'sets'; res.label = 'Top of range'; res.tone = 'ok'; res.reps = fill(rmax);
-        res.why = 'You hit ' + rmax + ' on every set. Add a set or slow the lowering to 3 seconds.';
       } else if (allTop) {
         var easy = allRated && maxRpe <= 7, nw = r2(Wt + inc * (easy ? 2 : 1));
         if (lh && nw > cap) {
@@ -114,6 +135,8 @@
         } else {
           res.action = 'weight'; res.label = '+' + r2(nw - Wt) + ' lb'; res.tone = 'ok'; res.w = nw; res.reps = fill(rmin);
           res.why = 'You hit ' + rmax + '+ on every set' + (easy ? ' and it felt easy (RPE \u2264 7), so a bigger jump' : '') + '. Add weight and build back up from ' + rmin + '.';
+          // Dumbbell/cable jumps reset to rmin; show a short range so the drop does not look like a hard 8.
+          if (inc <= 2.5 && mid > rmin) res.repHi = mid;
         }
       } else if (missed) {
         var prev = withSets[1], prevMissed = !!prev && working(prev.sets).some(function (s) { return R(s) < rmin; });

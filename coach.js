@@ -22,7 +22,9 @@
     if (kind === 'min') return sg.mins + ' min' + (sg.lv ? ' L' + sg.lv : '');
     var reps = sg.reps || [];
     var same = reps.length && reps.every(function (r) { return r === reps[0]; });
-    var rtxt = same ? reps[0] + ' ' + MUL + ' ' + reps.length : reps.join(', ');
+    var lo = same ? reps[0] : 0;
+    var range = same && sg.repHi && sg.repHi > lo;
+    var rtxt = range ? lo + '\u2013' + sg.repHi : (same ? reps[0] + ' ' + MUL + ' ' + reps.length : reps.join(', '));
     if (kind === 'none') return rtxt + ' reps';
     return (sg.w || 0) + ' lb ' + MUL + ' ' + rtxt;
   }
@@ -30,15 +32,20 @@
   function compactTarget(name, kind, sg) {
     if (!sg) return name;
     var tag = '';
-    if (sg.action === 'pain') tag = ' (hold, pain)';
+    if (sg.skippedLast) tag = ' (skipped last time \u2014 get at least 2 sets in)';
+    else if (sg.action === 'pain') tag = ' (hold, pain)';
     else if (sg.action === 'cap' || sg.action === 'blocked') tag = ' (hold)';
     else if (sg.action === 'deload' || sg.action === 'red') tag = ' (deload)';
     else if (sg.action === 'repeat') tag = ' (repeat)';
     if (kind === 'min') return name + ' ' + sg.mins + ' min' + (sg.lv ? ' L' + sg.lv : '') + tag;
     var reps = sg.reps || [];
     var same = reps.length && reps.every(function (r) { return r === reps[0]; });
-    if (kind === 'none') return name + ' ' + (same ? reps[0] + ' ' + MUL + ' ' + reps.length : reps.join('/')) + tag;
-    return name + ' ' + (sg.w || 0) + MUL + (same ? reps[0] + ' ' + MUL + ' ' + reps.length : reps.join('/')) + tag;
+    var lo = same ? reps[0] : 0;
+    var range = same && sg.repHi && sg.repHi > lo;
+    var rpart = range ? lo + '\u2013' + sg.repHi + ' ' + MUL + ' ' + reps.length
+      : (same ? reps[0] + ' ' + MUL + ' ' + reps.length : reps.join('/'));
+    if (kind === 'none' || ((sg.action === 'start' || sg.skippedLast) && !(+sg.w))) return name + ' ' + rpart + tag;
+    return name + ' ' + (sg.w || 0) + MUL + (range ? lo + '\u2013' + sg.repHi + ' ' + MUL + ' ' + reps.length : (same ? reps[0] + ' ' + MUL + ' ' + reps.length : reps.join('/'))) + tag;
   }
 
   // Compare done sets to the session target. Short a set, or any set under target weight/reps, is a miss.

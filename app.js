@@ -363,16 +363,18 @@
   function targetText(sg, kind, c) {
     if (kind === 'min') return sg.mins + ' min' + (sg.lv ? ' · level ' + sg.lv : '');
     var same = sg.reps.every(function (r) { return r === sg.reps[0]; });
-    var reps = same ? String(sg.reps[0]) : sg.reps.join('/');
+    var lo = same ? sg.reps[0] : 0;
+    var reps = (same && sg.repHi && sg.repHi > lo) ? lo + '–' + sg.repHi : (same ? String(sg.reps[0]) : sg.reps.join('/'));
     return (kind === 'lb' ? (sg.w || sg.action !== 'start' ? sg.w + ' lb × ' : 'your weight × ') : '') + reps + ' reps · ' + sg.reps.length + (sg.reps.length === 1 ? ' set' : ' sets') + ' <span class="muted">(range ' + c.rmin + '–' + c.rmax + ')</span>';
   }
-  var ARROW = { weight: '↑', rep: '↑', minutes: '↑', level: '↑', sets: '↑', hold: '→', repeat: '→', cap: '■', blocked: '■', pain: '■', deload: '↓', red: '↓', start: '•' };
+  var ARROW = { weight: '↑', rep: '↑', minutes: '↑', level: '↑', sets: '↑', tempo: '↑', hold: '→', repeat: '→', cap: '■', blocked: '■', pain: '■', deload: '↓', red: '↓', start: '•' };
   function entryCard(en, ei, iso, l) {
     var ex = exInfo(en.ex, en), c = cfgOf(en.ex, itemOf(l, en));
     var last = lastPerf(en.ex, iso);
     var dn = doneSets(en).length, all = en.sets.length > 0 && dn === en.sets.length;
     var note = en.note || ex.notes;
     var capOver = ex.kind === 'lb' && leftHold(ex) && en.sets.some(function (s) { return s.w > state.settings.cap; });
+    var skipNudge = skippedLastTime(en.ex, workoutIdOf(l) || sessionDayId(iso), iso);
     var sg = suggestFor(en.ex, entryItem(l, en), l.whoop, iso, ex.kind === 'min' ? 1 : en.sets.length || 1);
     var ctx = { last: last && last.kind === en.kind ? last : null, prs: entryPRs(en, iso), lastDone: -1, firstUndone: -1 };
     en.sets.forEach(function (s, i) { if (s.done) ctx.lastDone = i; else if (ctx.firstUndone < 0) ctx.firstUndone = i; });
@@ -385,6 +387,7 @@
       (ex.safety === 'avoid' ? '<div class="callout bad"><b>Loads the left arm</b>Not until your surgeon clears it. Tap Swap for a safe option.</div>' : '') +
       (capOver ? '<div class="callout bad">Over your ' + state.settings.cap + ' lb left-arm cap.</div>' : '') +
       (note ? '<p class="muted small">' + esc(note) + '</p>' : '') +
+      (skipNudge ? '<div class="callout warn">Skipped last time — get at least 2 sets in</div>' : '') +
       '<div class="tgt ' + sg.tone + '"><div class="tgt-top"><span class="tag ' + sg.tone + '">' + (ARROW[sg.action] || '') + ' ' + esc(sg.label) + '</span>' +
       '<span class="tgt-v"><span class="muted">Today:</span> ' + targetText(sg, ex.kind, c) + '</span></div>' +
       '<div class="small why">' + esc(why) + '</div>' +
@@ -440,6 +443,17 @@
       if (!last || k > last) last = k;
     });
     return last;
+  }
+  function skippedLastTime(exId, dayId, beforeIso) {
+    var k = lastCompleted(dayId, beforeIso);
+    if (!k) return false;
+    var found = false, done = false;
+    ((state.logs[k].entries) || []).forEach(function (en) {
+      if (en.ex !== exId) return;
+      found = true;
+      if (doneSets(en).length) done = true;
+    });
+    return found && !done;
   }
   function nextUp(beforeIso) {
     var best = null, bestDate = null, bestIdx = 999;
@@ -497,9 +511,15 @@
     var exercises = [], skipped = [], nexts = [];
     (l.entries || []).forEach(function (en) {
       var ds = doneSets(en), ex = exInfo(en.ex, en);
-      if (!ds.length && !en.pain) { skipped.push(ex.name); return; }
       var it = itemOf(l, en) || entryItem(l, en);
       var n = ex.kind === 'min' ? 1 : Math.max((it && it.sets) || 0, en.sets.length, 1);
+      if (!ds.length && !en.pain) {
+        skipped.push(ex.name);
+        var skipSg = suggestFor(en.ex, it, 'green', addDays(iso, 1), n);
+        skipSg.skippedLast = true;
+        nexts.push(C.compactTarget(ex.name, en.kind, skipSg));
+        return;
+      }
       var sg = suggestFor(en.ex, it, l.whoop || 'green', iso, n);
       var prs = [];
       entryPRs(en, iso).forEach(function (p) { p.forEach(function (x) { if (prs.indexOf(x.label) < 0) prs.push(x.label); }); });
@@ -989,7 +1009,9 @@
     h += '<h2 style="margin-left:0">Progression for this exercise</h2><div class="card">';
     if (ex.kind !== 'min') {
       h += sStep('Rep range low', 'cfg', 'rmin', c.rmin, '') + sStep('Rep range high', 'cfg', 'rmax', c.rmax, '') +
-        '<p class="small muted">Add reps until every set hits ' + c.rmax + ', then ' + (ex.kind === 'lb' ? 'add weight and drop back to ' + c.rmin + '.' : 'add a set or slow the tempo.') + '</p>';
+        '<p class="small muted">' + (ex.kind === 'lb'
+          ? 'Add reps until every set hits ' + c.rmax + ', then add weight and drop back to ' + c.rmin + '.'
+          : 'Even out to your best set, then add a rep. At higher reps, slow the tempo or hold a light plate with your RIGHT hand only.') + '</p>';
     }
     if (ex.kind === 'lb') {
       h += '<div class="alb" style="margin-top:10px">Weight step (+/− buttons and increases)</div>' + chipsFor('inc', [1, 2.5, 5, 10, 20], c.inc, 'lb') +

@@ -111,7 +111,9 @@ window.SEED = (function () {
         it('leg-ext', 3, 12, 0, '', ['sl-leg-ext']),
         it('machine-press-r', 3, 10, 0, '', ['db-bench-r', 'landmine-r', 'pec-deck-r']),
         it('lat-raise-r', 3, 12, 0, '', ['machine-lat-r', 'cable-lat-r']),
-        it('pushdown-r', 3, 12, 0, '', ['kickback-r', 'tri-machine-r'])
+        it('pushdown-r', 3, 12, 0, '', ['kickback-r', 'tri-machine-r']),
+        it('decline-situp', 3, 12, 0, 'Arms across the chest. No plate in the left hand.', ['heel-taps', 'dead-bug', 'machine-crunch']),
+        it('pallof-r', 3, 10, 0, 'Light to moderate, standing or half-kneeling. Skip if the left arm starts to brace.', ['suitcase-hold-r', 'dead-bug', 'machine-crunch'])
       ]
     },
     {
@@ -124,7 +126,9 @@ window.SEED = (function () {
         it('sl-curl', 3, 10, 0, '10/leg.', ['lying-curl', 'seated-curl', 'nordic-curl']),
         it('cs-row-r', 3, 10, 0, '', ['cable-row-r', 'machine-row-r']),
         it('rear-delt-r', 3, 12, 0, '', ['cable-row-r']),
-        it('curl-r', 3, 10, 0, '', ['cable-curl-r', 'preacher-r'])
+        it('curl-r', 3, 10, 0, '', ['cable-curl-r', 'preacher-r']),
+        it('machine-crunch', 3, 12, 0, 'Use pads, not handles.', ['cable-crunch', 'decline-situp', 'dead-bug']),
+        it('heel-taps', 3, 10, 0, 'On your back, small range, no reaching with the left.', ['dead-bug', 'decline-situp', 'bench-leg-raise'])
       ]
     },
     {
@@ -138,6 +142,8 @@ window.SEED = (function () {
         it('machine-press-r', 3, 10, 0, '', ['db-bench-r', 'landmine-r', 'pec-deck-r']),
         it('lat-raise-r', 3, 12, 0, '', ['machine-lat-r', 'cable-lat-r']),
         it('pushdown-r', 3, 12, 0, '', ['kickback-r', 'tri-machine-r']),
+        it('dead-bug', 3, 8, 0, 'Slow. Low back stays down. 8/side. No weight in the left hand.', ['heel-taps', 'bench-leg-raise', 'pallof-r']),
+        it('bench-leg-raise', 3, 10, 0, 'Right hand may lightly hold the bench; left stays off and unloaded.', ['dead-bug', 'heel-taps', 'decline-situp']),
         it('incline-walk', 1, 1, 10, 'Optional 8–10 min hands-free finisher. No gripping the rails with the left.', ['bike', 'recumbent'])
       ]
     },
@@ -152,6 +158,7 @@ window.SEED = (function () {
         it('cs-row-r', 3, 10, 0, '', ['cable-row-r', 'machine-row-r']),
         it('curl-r', 3, 10, 0, '', ['cable-curl-r', 'preacher-r']),
         it('dead-bug', 2, 8, 0, '', ['heel-taps', 'bench-leg-raise', 'pallof-r']),
+        it('decline-situp', 3, 12, 0, 'Arms across the chest. No plate in the left hand.', ['heel-taps', 'dead-bug', 'machine-crunch']),
         it('bike', 1, 1, 10, 'Optional 8–12 min hands-free finisher. No leaning or hanging on the left arm.', ['incline-walk', 'recumbent'])
       ]
     }

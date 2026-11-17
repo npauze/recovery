@@ -33,7 +33,7 @@
   // ---------- state ----------
   var P = window.PROG;
   var C = window.COACH;
-  var SCHEMA = 5;
+  var SCHEMA = 6;
   function seedDays() {
     return SEED.days.map(function (d) {
       return { id: d.id, name: d.name, focus: d.focus, weekdays: [], items: d.items.map(function (it) { var x = clone(it); x.id = uid(); return x; }) };
@@ -79,6 +79,35 @@
       d.items = Array.isArray(d.items) ? d.items : [];
       d.items.forEach(function (it) { if (!it.id) it.id = uid(); });
     });
+    // v6: add a short core finisher to each known training day if that day
+    // is missing it. Never remove, reorder, or rewrite existing items or logs.
+    if (from < 6) {
+      var seedById = {};
+      b.days.forEach(function (d) { seedById[d.id] = d; });
+      var catOf = {};
+      (s.library || []).forEach(function (x) { catOf[x.id] = x.cat; });
+      var CARDIO = { bike: 1, 'incline-walk': 1, recumbent: 1, stairs: 1 };
+      s.days.forEach(function (d) {
+        var seed = seedById[d.id];
+        if (!seed || !Array.isArray(d.items)) return;
+        var have = {};
+        d.items.forEach(function (it) { have[it.ex] = 1; });
+        var toAdd = [];
+        seed.items.forEach(function (it) {
+          if (catOf[it.ex] === 'core' && !have[it.ex]) {
+            var x = clone(it);
+            x.id = uid();
+            toAdd.push(x);
+          }
+        });
+        if (!toAdd.length) return;
+        var insertAt = d.items.length;
+        for (var i = 0; i < d.items.length; i++) {
+          if (CARDIO[d.items[i].ex]) { insertAt = i; break; }
+        }
+        d.items = d.items.slice(0, insertAt).concat(toAdd).concat(d.items.slice(insertAt));
+      });
+    }
     s.exCfg = s.exCfg && typeof s.exCfg === 'object' ? s.exCfg : {};
     s.logs = s.logs && typeof s.logs === 'object' ? s.logs : {};
     Object.keys(s.logs).forEach(function (k) {

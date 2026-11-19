@@ -19,6 +19,18 @@
   // Overshoot retune: 2.5 lb for DB/cable-style steps, otherwise 5 lb machines/barbell. Never round up.
   function retuneStep(c, inc) { if (c && c.retuneInc) return c.retuneInc; return (inc > 0 && inc <= 2.5) ? 2.5 : 5; }
   function floorInc(w, st) { st = st > 0 ? st : 5; return Math.max(0, r2(Math.floor((w + 1e-9) / st) * st)); }
+  // Reps the Epley estimate predicts at a new weight, from the best working set (raw reps, so RPE < 10 sets
+  // leave a natural buffer). Used after a weight jump so the target doesn't fall to the floor when the
+  // overshoot supports more. Returns { lo, hi } inside [floor, rmax], or null when it lands at/below the floor.
+  function jumpRange(ws, nw, floor, rmax) {
+    if (!(nw > 0) || !ws || !ws.length) return null;
+    var bestE = 0;
+    ws.forEach(function (s) { var e = epley(W(s), R(s)); if (e > bestE) bestE = e; });
+    if (!(bestE > nw)) return null;
+    var hi = Math.min(rmax, Math.floor(30 * (bestE / nw - 1) + 1e-9));
+    if (hi <= floor) return null;
+    return { lo: Math.max(floor, hi - 2), hi: hi };
+  }
 
   /* o: { kind: 'lb'|'none'|'min', hist: [{date, sets:[done sets], pain}] most recent first,
           cfg: {rmin, rmax, inc, minInc, lvInc}, item: {sets, reps, load}, nSets, whoop,
@@ -126,6 +138,8 @@
           res.label = jump > 0 ? '+' + jump + ' lb (retune)' : (jump < 0 ? jump + ' lb (retune)' : 'Mid-range');
           res.tone = 'ok';
           res.why = 'Last time went well past the ' + rmin + '\u2013' + rmax + ' range. New weight is estimated to land around ' + mid + ' reps at about RPE 8.';
+          var rr = jumpRange(ws, nw, mid, rmax);
+          if (rr) { res.repHi = rr.hi; if (rr.lo > mid) res.repLo = rr.lo; }
         }
       } else if (allTop) {
         var easy = allRated && maxRpe <= 7, nw = r2(Wt + inc * (easy ? 2 : 1));
@@ -135,8 +149,10 @@
         } else {
           res.action = 'weight'; res.label = '+' + r2(nw - Wt) + ' lb'; res.tone = 'ok'; res.w = nw; res.reps = fill(rmin);
           res.why = 'You hit ' + rmax + '+ on every set' + (easy ? ' and it felt easy (RPE \u2264 7), so a bigger jump' : '') + '. Add weight and build back up from ' + rmin + '.';
-          // Dumbbell/cable jumps reset to rmin; show a short range so the drop does not look like a hard 8.
-          if (inc <= 2.5 && mid > rmin) res.repHi = mid;
+          // The miss floor stays at rmin (res.reps). When the reps he hit at the old weight predict more at
+          // the new one (Epley, capped to the range), show that as a target range, e.g. 325×10–12.
+          var jr = jumpRange(ws, nw, rmin, rmax);
+          if (jr) { res.repHi = jr.hi; if (jr.lo > rmin) res.repLo = jr.lo; res.why = 'You hit ' + rmax + '+ on every set' + (easy ? ' and it felt easy (RPE \u2264 7), so a bigger jump' : '') + '. Add weight. Your last sets point to about ' + (jr.lo < jr.hi ? jr.lo + '\u2013' + jr.hi : jr.hi) + ' reps here; ' + rmin + ' is the floor.'; }
         }
       } else if (missed) {
         var prev = withSets[1], prevMissed = !!prev && working(prev.sets).some(function (s) { return R(s) < rmin; });
@@ -199,6 +215,6 @@
     return epley(W(s), R(s)) > epley(W(l), R(l)) ? 1 : -1;
   }
 
-  var api = { suggest: suggest, detectPRs: detectPRs, epley: epley, working: working, vol: vol, deload: deload, beat: beat, midRange: midRange, floorInc: floorInc };
+  var api = { suggest: suggest, detectPRs: detectPRs, epley: epley, working: working, vol: vol, deload: deload, beat: beat, midRange: midRange, floorInc: floorInc, jumpRange: jumpRange };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.PROG = api;
 })(this);

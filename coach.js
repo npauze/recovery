@@ -22,17 +22,27 @@
     if (kind === 'min') return sg.mins + ' min' + (sg.lv ? ' L' + sg.lv : '');
     var reps = sg.reps || [];
     var same = reps.length && reps.every(function (r) { return r === reps[0]; });
-    var lo = same ? reps[0] : 0;
+    var lo = same ? (sg.repLo || reps[0]) : 0;
     var range = same && sg.repHi && sg.repHi > lo;
     var rtxt = range ? lo + '\u2013' + sg.repHi : (same ? reps[0] + ' ' + MUL + ' ' + reps.length : reps.join(', '));
     if (kind === 'none') return rtxt + ' reps';
     return (sg.w || 0) + ' lb ' + MUL + ' ' + rtxt;
   }
 
+  // Skipped-last-time nudge. Timed items (cardio, kind 'min') get a minutes ask, never "sets".
+  function skipNudge(kind, sg) {
+    if (kind === 'min') {
+      var m = (sg && +sg.mins) || 0;
+      var ask = m > 0 ? Math.min(m, Math.max(5, Math.round(m / 2))) : 5;
+      return 'Skipped last time \u2014 get it in, even ' + ask + ' min';
+    }
+    return 'Skipped last time \u2014 get at least 2 sets in';
+  }
+
   function compactTarget(name, kind, sg) {
     if (!sg) return name;
     var tag = '';
-    if (sg.skippedLast) tag = ' (skipped last time \u2014 get at least 2 sets in)';
+    if (sg.skippedLast) tag = ' (' + skipNudge(kind, sg).toLowerCase() + ')';
     else if (sg.action === 'pain') tag = ' (hold, pain)';
     else if (sg.action === 'cap' || sg.action === 'blocked') tag = ' (hold)';
     else if (sg.action === 'deload' || sg.action === 'red') tag = ' (deload)';
@@ -40,7 +50,7 @@
     if (kind === 'min') return name + ' ' + sg.mins + ' min' + (sg.lv ? ' L' + sg.lv : '') + tag;
     var reps = sg.reps || [];
     var same = reps.length && reps.every(function (r) { return r === reps[0]; });
-    var lo = same ? reps[0] : 0;
+    var lo = same ? (sg.repLo || reps[0]) : 0;
     var range = same && sg.repHi && sg.repHi > lo;
     var rpart = range ? lo + '\u2013' + sg.repHi + ' ' + MUL + ' ' + reps.length
       : (same ? reps[0] + ' ' + MUL + ' ' + reps.length : reps.join('/'));
@@ -143,6 +153,6 @@
     return lines.join('\n').trim() + '\n';
   }
 
-  var api = { formatSets: formatSets, formatTarget: formatTarget, compactTarget: compactTarget, vsTarget: vsTarget, isBaseline: isBaseline, formatWorkout: formatWorkout, formatWeekly: formatWeekly };
+  var api = { skipNudge: skipNudge, formatSets: formatSets, formatTarget: formatTarget, compactTarget: compactTarget, vsTarget: vsTarget, isBaseline: isBaseline, formatWorkout: formatWorkout, formatWeekly: formatWeekly };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.COACH = api;
 })(this);

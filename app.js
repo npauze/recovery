@@ -279,7 +279,7 @@
     var sg = suggestFor(it.ex, it, whoop, iso, n);
     var sets = [];
     if (ex.kind === 'min') sets.push({ w: sg.mins, r: 0, lv: sg.lv || 0, done: false });
-    else for (var i = 0; i < n; i++) sets.push({ w: ex.kind === 'none' ? 0 : sg.w, r: sg.reps[i], done: false });
+    else for (var i = 0; i < n; i++) sets.push({ w: ex.kind === 'none' ? 0 : sg.w, r: sg.repLo || sg.reps[i], done: false });
     return { id: uid(), itemId: it.id, ex: it.ex, name: ex.name, kind: ex.kind, note: it.note || '', sets: sets, notes: '', touched: false, pain: false };
   }
   function sigOf(d, whoop) { return whoop + '|' + JSON.stringify(d.items.map(function (i) { return [i.id, i.ex, i.sets, i.reps, i.load, i.note]; })); }
@@ -363,7 +363,7 @@
   function targetText(sg, kind, c) {
     if (kind === 'min') return sg.mins + ' min' + (sg.lv ? ' · level ' + sg.lv : '');
     var same = sg.reps.every(function (r) { return r === sg.reps[0]; });
-    var lo = same ? sg.reps[0] : 0;
+    var lo = same ? (sg.repLo || sg.reps[0]) : 0;
     var reps = (same && sg.repHi && sg.repHi > lo) ? lo + '–' + sg.repHi : (same ? String(sg.reps[0]) : sg.reps.join('/'));
     return (kind === 'lb' ? (sg.w || sg.action !== 'start' ? sg.w + ' lb × ' : 'your weight × ') : '') + reps + ' reps · ' + sg.reps.length + (sg.reps.length === 1 ? ' set' : ' sets') + ' <span class="muted">(range ' + c.rmin + '–' + c.rmax + ')</span>';
   }
@@ -387,7 +387,7 @@
       (ex.safety === 'avoid' ? '<div class="callout bad"><b>Loads the left arm</b>Not until your surgeon clears it. Tap Swap for a safe option.</div>' : '') +
       (capOver ? '<div class="callout bad">Over your ' + state.settings.cap + ' lb left-arm cap.</div>' : '') +
       (note ? '<p class="muted small">' + esc(note) + '</p>' : '') +
-      (skipNudge ? '<div class="callout warn">Skipped last time — get at least 2 sets in</div>' : '') +
+      (skipNudge ? '<div class="callout warn">' + esc(C.skipNudge(ex.kind, sg)) + '</div>' : '') +
       '<div class="tgt ' + sg.tone + '"><div class="tgt-top"><span class="tag ' + sg.tone + '">' + (ARROW[sg.action] || '') + ' ' + esc(sg.label) + '</span>' +
       '<span class="tgt-v"><span class="muted">Today:</span> ' + targetText(sg, ex.kind, c) + '</span></div>' +
       '<div class="small why">' + esc(why) + '</div>' +

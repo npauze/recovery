@@ -33,7 +33,8 @@
   // ---------- state ----------
   var P = window.PROG;
   var C = window.COACH;
-  var SCHEMA = 6;
+  var RT = window.REST;
+  var SCHEMA = 7;
   function seedDays() {
     return SEED.days.map(function (d) {
       return { id: d.id, name: d.name, focus: d.focus, weekdays: [], items: d.items.map(function (it) { var x = clone(it); x.id = uid(); return x; }) };
@@ -43,10 +44,11 @@
   function seedState() {
     return {
       v: SCHEMA,
-      settings: { surgery: '2026-10-26', checkup: '2026-12-08', cap: 8, step: 5, romTarget: 3, rpeOn: true },
+      settings: { surgery: '2026-10-26', checkup: '2026-12-08', cap: 8, step: 5, romTarget: 3, rpeOn: true, restOn: true, restSound: true },
       library: seedLibrary(),
       days: seedDays(),
       exCfg: {},
+      restCfg: {},
       logs: {},
       dec8: { checked: {}, answers: '' }
     };
@@ -109,6 +111,8 @@
       });
     }
     s.exCfg = s.exCfg && typeof s.exCfg === 'object' ? s.exCfg : {};
+    // v7: per-exercise rest overrides (seconds). Defaults come from SEED.rest, so nothing else changes.
+    s.restCfg = s.restCfg && typeof s.restCfg === 'object' ? s.restCfg : {};
     s.logs = s.logs && typeof s.logs === 'object' ? s.logs : {};
     Object.keys(s.logs).forEach(function (k) {
       var l = s.logs[k];
@@ -187,6 +191,13 @@
   }
   function setCfg(exId, k, v) { var cur = cfgOf(exId); var c = state.exCfg[exId] = state.exCfg[exId] || { rmin: cur.rmin, rmax: cur.rmax }; c[k] = v; if (c.rmax < c.rmin) { if (k === 'rmin') c.rmax = c.rmin; else c.rmin = c.rmax; } }
   function leftHold(ex) { return ex.leftHold != null ? !!ex.leftHold : ex.safety === 'avoid'; }
+  // rest between sets (seconds, 0 = no timer): the user's override, else the default rule from data.js
+  function restDefault(exId) { return SEED.rest.forEx(exInfo(exId)); }
+  function restOf(exId) {
+    var c = state.restCfg && state.restCfg[exId];
+    if (typeof c === 'number' && isFinite(c)) return exInfo(exId).kind === 'min' ? 0 : c;
+    return restDefault(exId);
+  }
   function stepOf(en) { return en.kind === 'min' ? (cfgOf(en.ex).minInc || 1) : cfgOf(en.ex).inc; }
 
   // ---------- performance history ----------
@@ -913,6 +924,10 @@
       '<label class="f">Default weight step (lb), for exercises without their own<input type="number" inputmode="decimal" data-field="setting" data-k="step" value="' + s.step + '"></label>' +
       '<label class="q" style="border:0"><input type="checkbox" data-field="rpeon"' + (s.rpeOn ? ' checked' : '') + '><span>Ask for RPE (effort 6–10) after each set. Easy sets earn bigger jumps.</span></label>' +
       '<p class="small muted">Only raise the cap after your surgeon clears it.</p></div>';
+    h += '<h2>Rest timer</h2><div class="card">' +
+      '<label class="q" style="border:0"><input type="checkbox" data-field="reston"' + (s.restOn ? ' checked' : '') + '><span>Start a rest timer when I check off a set</span></label>' +
+      '<label class="q" style="border:0"><input type="checkbox" data-field="restsound"' + (s.restSound ? ' checked' : '') + '><span>Beep and vibrate when rest is over</span></label>' +
+      '<p class="small muted">Change the rest for any exercise with its Adjust button. Defaults: 2:30 big lower-body lifts and chest press, 1:30 rows and other right-arm compounds, 1:15 isolation, 45–60 s core, none for cardio.</p></div>';
     h += '<h2>Backup</h2><div class="card"><p class="small muted">Everything is stored on this phone only. Export a backup now and then (it saves a .json file you can keep in Files or email to yourself).</p>' +
       '<div class="row"><button class="btn pri grow" data-act="export">Export backup</button><label class="btn grow" for="importfile">Import backup</label></div>' +
       '<input id="importfile" type="file" accept="application/json,.json" data-field="import" hidden></div>';
@@ -1023,6 +1038,19 @@
     }
     if (ex.safety !== 'safe') h += '<div class="callout ' + (ex.safety === 'avoid' ? 'bad' : 'warn') + '">' + (ex.safety === 'avoid' ? 'Loads the left arm, so it never gets an increase until you’re cleared.' : 'Increases only make sense if the left arm stays fully passive.') + '</div>';
     if (c.custom) h += '<button class="btn sm ghost block" data-act="cfgreset">Reset to defaults</button>';
+    h += '</div>';
+    return h + restCard(sh.ex);
+  }
+  function restCard(exId) {
+    var ex = exInfo(exId), h = '<h2 style="margin-left:0">Rest between sets</h2><div class="card">';
+    if (ex.kind === 'min') return h + '<p class="small muted">No rest timer for timed cardio.</p></div>';
+    var cur = restOf(exId), def = restDefault(exId), own = typeof (state.restCfg || {})[exId] === 'number';
+    h += sStep('Rest', 'rst', 'rest', cur, 'sec') +
+      '<div class="chips" style="margin-top:8px">' + [0, 45, 60, 75, 90, 120, 150, 180].map(function (v) {
+        return '<button class="chip' + (cur === v ? ' on' : '') + '" data-act="restset" data-v="' + v + '">' + (v ? RT.label(v) : 'Off') + '</button>';
+      }).join('') + '</div>' +
+      '<p class="small muted">' + (cur ? 'Timer: ' + RT.label(cur) + ' after each set.' : 'No timer for this exercise.') + ' Default ' + RT.label(def) + '. Saved for this exercise; your logged sets don’t change.</p>' +
+      (own ? '<button class="btn sm ghost block" data-act="restreset">Use default (' + RT.label(def) + ')</button>' : '');
     return h + '</div>';
   }
   function customForm(sh) {
@@ -1084,6 +1112,130 @@
     return { id: uid(), ex: x.id, sets: x.kind === 'min' ? 1 : 3, reps: x.kind === 'min' ? 1 : 10, load: x.kind === 'min' ? 20 : 0, note: '', alts: [] };
   }
 
+  // ---------- rest timer ----------
+  // Lives in its own key so it never touches the program or history. Timestamp based (Date.now()).
+  var TKEY = KEY + '-timer';
+  var timer = (function () { try { return JSON.parse(localStorage.getItem(TKEY) || 'null'); } catch (e) { return null; } })();
+  var tickT = null, endT = null, audioCtx = null;
+  function persistRest() { try { if (timer) localStorage.setItem(TKEY, JSON.stringify(timer)); else localStorage.removeItem(TKEY); } catch (e) { /* ignore */ } }
+  function clearRest() { timer = null; persistRest(); renderRest(); }
+  function unlockAudio() {
+    if (!state.settings.restSound) return;
+    try {
+      var AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+      if (!audioCtx) audioCtx = new AC();
+      if (audioCtx.state === 'suspended' && audioCtx.resume) audioCtx.resume();
+    } catch (e) { audioCtx = null; }
+  }
+  function beep() {
+    try {
+      if (!audioCtx) return;
+      var t0 = audioCtx.currentTime;
+      [0, 0.22].forEach(function (off) {
+        var o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        o.type = 'sine'; o.frequency.value = 880;
+        g.gain.setValueAtTime(0.0001, t0 + off);
+        g.gain.exponentialRampToValueAtTime(0.18, t0 + off + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + off + 0.16);
+        o.connect(g); g.connect(audioCtx.destination); o.start(t0 + off); o.stop(t0 + off + 0.18);
+      });
+    } catch (e) { /* no sound */ }
+  }
+  function restAlert() {
+    window.__restAlerts = (window.__restAlerts || 0) + 1;
+    if (!state.settings.restSound) return;
+    try { if (navigator.vibrate) navigator.vibrate([180, 90, 180]); } catch (e) { /* ignore */ }
+    beep();
+  }
+  function nextLabel(l, en, si) {
+    for (var k = si + 1; k < en.sets.length; k++) if (!en.sets[k].done) return 'Next: set ' + (k + 1) + ' of ' + exInfo(en.ex, en).name;
+    var i0 = l.entries.indexOf(en);
+    for (var j = 1; j < l.entries.length; j++) {
+      var nx = l.entries[(i0 + j) % l.entries.length];
+      if (nx.sets.some(function (x) { return !x.done; })) return 'Next: ' + exInfo(nx.ex, nx).name;
+    }
+    return 'Last set done \u2014 nice work';
+  }
+  function startRest(iso, l, en, si) {
+    if (!state.settings.restOn || en.kind === 'min') return;
+    if (iso < addDays(todayKey(), -1) || iso > todayKey()) return; // backfilling an old day: no timer
+    var secs = restOf(en.ex); if (!secs) return;
+    var ex = exInfo(en.ex, en);
+    unlockAudio();
+    timer = RT.start({ iso: iso, entryId: en.id, si: si, ex: en.ex, name: ex.name, rom: RT.romEligible(ex), romLogged: false, next: nextLabel(l, en, si) }, secs, Date.now());
+    persistRest(); renderRest();
+  }
+  function stopRestFor(en, si) { if (timer && timer.entryId === en.id && (si == null || timer.si === si)) clearRest(); }
+  function restControl(a) {
+    if (!timer) return;
+    var now = Date.now();
+    if (a === 'rskip') { clearRest(); return; }
+    if (a === 'rplus') RT.adjust(timer, 30, now);
+    else if (a === 'rminus') RT.adjust(timer, -30, now);
+    else if (a === 'rpause') { if (!RT.done(timer, now)) RT.toggle(timer, now); }
+    else if (a === 'rrom') {
+      var l = getLog(timer.iso);
+      if (timer.romLogged) { l.rom = Math.max(0, (l.rom || 0) - 1); timer.romLogged = false; toast('ROM session removed'); }
+      else { l.rom = (l.rom || 0) + 1; timer.romLogged = true; vibrate(); toast('ROM session ' + l.rom + ' logged'); }
+      save(); persistRest(); render(); return;
+    }
+    persistRest(); renderRest(); restTick();
+  }
+  function restBarHtml(now) {
+    var dn = RT.done(timer, now), pz = !!timer.paused;
+    var time = dn ? '+' + RT.clock(RT.overtime(timer, now)) : RT.clock(RT.remaining(timer, now));
+    var h = '<div class="rest-bar' + (dn ? ' done' : '') + (pz ? ' paused' : '') + '" role="timer" aria-live="off">' +
+      '<div class="rest-prog"><i id="rest-fill" style="width:' + Math.round(RT.progress(timer, now) * 100) + '%"></i></div>' +
+      '<div class="rest-top"><div class="rest-time" id="rest-time">' + time + '</div><div class="rest-lbl grow"><b id="rest-head">' +
+      (dn ? 'Go \u2014 next set' : pz ? 'Paused' : 'Rest') + '</b><span class="muted small">' + esc(timer.next || timer.name || '') + '</span></div></div>' +
+      '<div class="rest-ctl">' +
+      '<button class="btn sm" data-act="rminus" aria-label="Minus 30 seconds">\u221230s</button>' +
+      '<button class="btn sm" data-act="rplus" aria-label="Plus 30 seconds">+30s</button>' +
+      (dn ? '' : '<button class="btn sm" data-act="rpause">' + (pz ? 'Resume' : 'Pause') + '</button>') +
+      '<button class="btn sm ' + (dn ? 'pri' : 'ghost') + '" data-act="rskip">' + (dn ? 'Done' : 'Skip') + '</button></div>';
+    if (timer.rom && (!dn || timer.romLogged)) {
+      h += '<button class="rest-rom' + (timer.romLogged ? ' on' : '') + '" data-act="rrom">' +
+        (timer.romLogged ? '\u2713 ROM session logged \u00b7 tap to undo' : esc(RT.ROM_TEXT) + ' <b>Tap when done to log it.</b>') + '</button>';
+    }
+    return h + '</div>';
+  }
+  function renderRest() {
+    var root = $('#rest-root'); if (!root) return;
+    var now = Date.now();
+    if (timer && RT.stale(timer, now)) { timer = null; persistRest(); }
+    var show = !!(timer && state.settings.restOn && ui.tab === 'today');
+    clearTimeout(endT);
+    if (!timer) { clearInterval(tickT); tickT = null; }
+    if (!show) { root.innerHTML = ''; document.body.classList.remove('has-rest'); document.body.style.removeProperty('--resth'); }
+    else {
+      root.innerHTML = restBarHtml(now);
+      document.body.classList.add('has-rest');
+      document.body.style.setProperty('--resth', root.firstChild.offsetHeight + 'px');
+    }
+    if (timer) {
+      if (!tickT) tickT = setInterval(restTick, 250);
+      var left = RT.remaining(timer, now);
+      if (!timer.paused && left > 0) endT = setTimeout(restTick, left + 20); // fire on time even if the interval is throttled
+    }
+  }
+  function restTick() {
+    if (!timer) { renderRest(); return; }
+    var now = Date.now();
+    if (RT.stale(timer, now)) { clearRest(); return; }
+    if (RT.done(timer, now) && !timer.alerted) {
+      timer.alerted = true; persistRest();
+      // only buzz/beep when it is on time, not when the app reopens long after the rest ended
+      if (RT.overtime(timer, now) < 10000) restAlert();
+      renderRest(); return;
+    }
+    var tEl = document.getElementById('rest-time'); if (!tEl) return;
+    var dn = RT.done(timer, now);
+    tEl.textContent = dn ? '+' + RT.clock(RT.overtime(timer, now)) : RT.clock(RT.remaining(timer, now));
+    var f = document.getElementById('rest-fill'); if (f) f.style.width = Math.round(RT.progress(timer, now) * 100) + '%';
+    var bar = tEl.closest('.rest-bar');
+    if (bar && dn !== bar.classList.contains('done')) renderRest();
+  }
+
   // ---------- render ----------
   var TITLES = { today: 'Today', program: 'Program', history: 'History', rehab: 'Rehab', more: 'More' };
   function render() {
@@ -1093,6 +1245,7 @@
     var s = state.settings, pod = diff(s.surgery, todayKey());
     $('#sub').textContent = 'Post-op day ' + pod + ' · ' + Math.max(0, diff(todayKey(), s.checkup)) + 'd to checkup';
     Array.prototype.forEach.call(document.querySelectorAll('#tabs button'), function (b) { b.classList.toggle('on', b.dataset.tab === ui.tab); });
+    renderRest();
   }
   var toastT;
   function toast(msg, ms) { var t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(function () { t.classList.remove('on'); }, ms || 1800); }
@@ -1136,7 +1289,9 @@
           if (prs.length) { ui.pop = en.id + ':' + D.s; toast('🏆 ' + prs.map(function (p) { return p.label; }).join(' · ')); if (navigator.vibrate) navigator.vibrate([20, 60, 20, 60, 40]); }
           else vibrate();
         }
-        render(); ui.pop = null; return;
+        render(); ui.pop = null;
+        if (s2.done) startRest(ui.date, l, en, +D.s); else stopRestFor(en, +D.s);
+        return;
       }
       case 'rpe': { l = state.logs[ui.date]; en = l.entries[+D.e]; var s3 = en.sets[+D.s], v = +D.v; s3.rpe = s3.rpe === v ? 0 : v; if (!s3.rpe) delete s3.rpe; en.touched = true; delete ui.open[en.id]; save(); render(); return; }
       case 'sopen': { l = state.logs[ui.date]; en = l.entries[+D.e]; if (ui.open[en.id] === +D.s) delete ui.open[en.id]; else ui.open[en.id] = +D.s; render(); return; }
@@ -1179,9 +1334,15 @@
       case 'cfg': { var cc = cfgOf(ui.sheet.ex, ui.sheet.item); setCfg(ui.sheet.ex, D.k, clamp(cc[D.k] + (+D.dir), 1, 100)); save(); renderSheet(); render(); return; }
       case 'cfgset': setCfg(ui.sheet.ex, D.k, +D.v); save(); renderSheet(); render(); return;
       case 'cfgreset': delete state.exCfg[ui.sheet.ex]; save(); renderSheet(); render(); return;
+      case 'rminus': case 'rplus': case 'rpause': case 'rskip': case 'rrom': restControl(a); return;
+      case 'restset': state.restCfg[ui.sheet.ex] = clamp(Math.round(+D.v), 0, 600); save(); renderSheet(); return;
+      case 'rst': state.restCfg[ui.sheet.ex] = clamp(restOf(ui.sheet.ex) + 15 * (+D.dir), 0, 600); save(); renderSheet(); return;
+      case 'restreset': delete state.restCfg[ui.sheet.ex]; save(); renderSheet(); return;
       case 'edone': {
         l = state.logs[ui.date]; en = l.entries[+D.e]; var all = en.sets.every(function (s) { return s.done; });
-        en.sets.forEach(function (s) { s.done = !all; }); en.touched = true; if (!all) vibrate(); save(); render(); return;
+        en.sets.forEach(function (s) { s.done = !all; }); en.touched = true; if (!all) vibrate(); save(); render();
+        if (!all) startRest(ui.date, l, en, en.sets.length - 1); else stopRestFor(en);
+        return;
       }
       case 'addset': l = state.logs[ui.date]; en = l.entries[+D.e]; var lastS = en.sets[en.sets.length - 1] || { w: 0, r: 10 }; en.sets.push({ w: lastS.w, r: lastS.r, done: false }); en.touched = true; save(); render(); return;
       case 'delset': l = state.logs[ui.date]; en = l.entries[+D.e]; if (en.sets.length > 1) en.sets.pop(); en.touched = true; save(); render(); return;
@@ -1255,7 +1416,7 @@
       case 'openday': ui.date = D.k; ui.tab = 'today'; ui.picking = false; closeSheet(); render(); window.scrollTo(0, 0); return;
       // more
       case 'export': exportData(); return;
-      case 'wipe': if (confirm('Erase all program, logs, and settings on this phone? Export a backup first if you want to keep them.')) { localStorage.removeItem(KEY); state = seedState(); save(); render(); toast('Reset to fresh'); } return;
+      case 'wipe': if (confirm('Erase all program, logs, and settings on this phone? Export a backup first if you want to keep them.')) { localStorage.removeItem(KEY); timer = null; persistRest(); state = seedState(); save(); render(); toast('Reset to fresh'); } return;
     }
   });
 
@@ -1287,6 +1448,9 @@
     } else if (f === 'adjprog') { ui.sheet.alsoProg = t.checked; }
     else if (f === 'lefthold') { var lx = lib(ui.sheet.ex); if (lx) { lx.leftHold = t.checked; save(); render(); } }
     else if (f === 'rpeon') { state.settings.rpeOn = t.checked; save(); toast('Saved'); }
+    else if (f === 'reston') { state.settings.restOn = t.checked; if (!t.checked) { timer = null; persistRest(); } save(); renderRest(); toast('Saved'); }
+    else if (f === 'restsound') { state.settings.restSound = t.checked; if (t.checked) unlockAudio(); save(); toast('Saved'); }
+    else if (f === 'rstnum') { state.restCfg[ui.sheet.ex] = clamp(Math.round(num(t.value, restOf(ui.sheet.ex))), 0, 600); save(); renderSheet(); }
     else if (f === 'pnum') {
       var it = day(D.d).items[+D.i], v2 = Math.max(0, num(t.value, 0));
       if (D.k === 'psets') it.sets = clamp(Math.round(v2), 1, 12); else if (D.k === 'preps') it.reps = clamp(Math.round(v2), 1, 100); else it.load = v2;
@@ -1308,7 +1472,7 @@
     } else if (f === 'import') { importFile(t.files && t.files[0]); t.value = ''; }
   });
   document.addEventListener('focusin', function (e) {
-    var t = e.target; if (t.tagName === 'INPUT' && /^(set|pnum|adjnum|cfgnum)$/.test(t.dataset.field || '')) setTimeout(function () { try { t.select(); } catch (x) { /* ignore */ } }, 0);
+    var t = e.target; if (t.tagName === 'INPUT' && /^(set|pnum|adjnum|cfgnum|rstnum)$/.test(t.dataset.field || '')) setTimeout(function () { try { t.select(); } catch (x) { /* ignore */ } }, 0);
   });
   document.addEventListener('keydown', function (e) { if (e.key === 'Enter' && e.target.tagName === 'INPUT' && e.target.dataset.field === 'set') e.target.blur(); });
   // press and hold +/- to keep stepping
@@ -1333,7 +1497,8 @@
   ['pointerup', 'pointercancel'].forEach(function (ev) { document.addEventListener(ev, endHold); });
   document.addEventListener('contextmenu', function (e) { if (e.target.closest && e.target.closest('.step')) e.preventDefault(); });
   window.addEventListener('pagehide', save);
-  document.addEventListener('visibilitychange', function () { if (document.hidden) save(); else if (ui.tab === 'today' && ui.lastDay !== todayKey()) { ui.date = todayKey(); ui.lastDay = ui.date; render(); } });
+  window.addEventListener('pageshow', function () { restTick(); });
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) restTick(); if (document.hidden) save(); else if (ui.tab === 'today' && ui.lastDay !== todayKey()) { ui.date = todayKey(); ui.lastDay = ui.date; render(); } });
   ui.lastDay = todayKey();
 
   // ---------- backup ----------
@@ -1376,5 +1541,5 @@
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
     window.addEventListener('load', function () { navigator.serviceWorker.register('./service-worker.js').catch(function (e) { console.warn('SW', e); }); });
   }
-  window.__app = { get state() { return state; }, ui: ui, render: render, save: save, migrate: migrate, suggestFor: suggestFor, weekStats: weekStats, cfgOf: cfgOf, nextUp: nextUp, recentWorkouts: recentWorkouts, lastCompleted: lastCompleted, workoutSummary: workoutSummary, weeklySummary: weeklySummary, workoutSummaryData: workoutSummaryData, weeklySummaryData: weeklySummaryData, shareCoach: shareCoach };
+  window.__app = { get state() { return state; }, ui: ui, render: render, save: save, migrate: migrate, suggestFor: suggestFor, weekStats: weekStats, cfgOf: cfgOf, nextUp: nextUp, recentWorkouts: recentWorkouts, lastCompleted: lastCompleted, workoutSummary: workoutSummary, weeklySummary: weeklySummary, workoutSummaryData: workoutSummaryData, weeklySummaryData: weeklySummaryData, shareCoach: shareCoach, restOf: restOf, get timer() { return timer; }, restTick: restTick };
 })();

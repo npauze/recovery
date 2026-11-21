@@ -164,6 +164,33 @@ window.SEED = (function () {
     }
   ];
 
+  // Default rest between sets, in seconds. Rule by muscle group, with per-exercise overrides.
+  // 0 = no rest timer (cardio and other timed items). ROM/rehab work is not in the library and never gets one.
+  var rest = {
+    byCat: { quads: 150, hams: 150, hips: 150, calves: 75, core: 60, push: 90, pull: 90, delts: 75, arms: 75, cardio: 0, other: 90 },
+    byId: {
+      // big compound lower-body lifts and the chest press: 150
+      'hack-squat': 150, 'leg-press': 150, 'belt-squat': 150, 'hip-thrust-machine': 150, 'bss-r': 150, 'step-up-r': 150,
+      'sl-rdl-r': 150, 'seated-curl': 150, 'lying-curl': 150, 'machine-press-r': 150, 'db-bench-r': 150,
+      // single-leg / lighter lower-body work: 90
+      'sl-curl': 90, 'sl-leg-press': 90, 'glute-bridge': 90, 'sl-glute-bridge': 90, 'bw-split-squat': 90,
+      // isolation: 75
+      'leg-ext': 75, 'sl-leg-ext': 75, 'back-ext': 75, 'hip-abd': 75, 'hip-add': 75, 'cable-abd': 75,
+      'glute-kick': 75, 'cable-kickback': 75, 'reverse-hyper': 75, 'pec-deck-r': 75,
+      // core: 45-60
+      'dead-bug': 45, 'heel-taps': 45, 'bench-leg-raise': 60, 'decline-situp': 60, 'machine-crunch': 60,
+      'cable-crunch': 60, 'pallof-r': 45, 'suitcase-hold-r': 45
+    }
+  };
+  // ex: a library entry ({id, cat, kind}). Returns default rest seconds (0 = no timer).
+  rest.forEx = function (ex) {
+    if (!ex) return 90;
+    if (ex.kind === 'min' || ex.cat === 'cardio') return 0;
+    if (Object.prototype.hasOwnProperty.call(rest.byId, ex.id)) return rest.byId[ex.id];
+    var c = rest.byCat[ex.cat];
+    return c == null ? 90 : c;
+  };
+
   var rehab = {
     rom: [
       ['Elbow flexion and extension', "Gentle, slow, active motion. Don't force end range or add weight."],
@@ -210,5 +237,5 @@ window.SEED = (function () {
     ]
   };
 
-  return { library: L, days: days, rehab: rehab };
+  return { library: L, days: days, rehab: rehab, rest: rest };
 })();

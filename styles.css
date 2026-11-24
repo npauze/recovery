@@ -265,3 +265,24 @@ textarea.share-text { font: 14px/1.45 ui-monospace, SFMono-Regular, Menlo, Conso
 .rest-rom.on { border-style: solid; border-color: var(--ok); background: var(--ok-soft); font-weight: 600; }
 body.has-rest { padding-bottom: calc(var(--tabh) + var(--sab) + var(--resth, 120px) + 24px); }
 body.has-rest #toast { bottom: calc(var(--tabh) + var(--sab) + var(--resth, 120px) + 14px); }
+
+/* v11: checkable warm-up block */
+.warmup-card details { margin: 0; }
+.warmup-sum {
+  list-style: none; display: flex; align-items: center; gap: 10px;
+  cursor: pointer; min-height: 44px; touch-action: manipulation;
+}
+.warmup-sum::-webkit-details-marker, .warmup-sum::marker { display: none; content: ''; }
+.warmup-card.done { border-color: var(--ok); }
+.warmup-item {
+  display: flex; align-items: flex-start; gap: 10px; width: 100%; text-align: left;
+  border: 0; background: var(--card2); color: var(--text); border-radius: 12px;
+  padding: 10px 12px; margin: 6px 0 0; font: inherit; font-family: inherit;
+  min-height: 56px; touch-action: manipulation;
+}
+.warmup-item:active { transform: scale(.99); }
+.warmup-item.on { background: var(--ok-soft); }
+.warmup-item .check { margin-top: 2px; }
+@media (max-width: 380px) {
+  .warmup-item { padding: 10px; }
+}

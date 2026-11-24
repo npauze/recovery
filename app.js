@@ -34,7 +34,8 @@
   var P = window.PROG;
   var C = window.COACH;
   var RT = window.REST;
-  var SCHEMA = 7;
+  var W = window.WARM;
+  var SCHEMA = 8;
   function seedDays() {
     return SEED.days.map(function (d) {
       return { id: d.id, name: d.name, focus: d.focus, weekdays: [], items: d.items.map(function (it) { var x = clone(it); x.id = uid(); return x; }) };
@@ -44,7 +45,7 @@
   function seedState() {
     return {
       v: SCHEMA,
-      settings: { surgery: '2026-10-26', checkup: '2026-12-08', cap: 8, step: 5, romTarget: 3, rpeOn: true, restOn: true, restSound: true },
+      settings: { surgery: '2026-10-26', checkup: '2026-12-08', cap: 8, step: 5, romTarget: 3, rpeOn: true, restOn: true, restSound: true, warmOn: true },
       library: seedLibrary(),
       days: seedDays(),
       exCfg: {},
@@ -113,6 +114,7 @@
     s.exCfg = s.exCfg && typeof s.exCfg === 'object' ? s.exCfg : {};
     // v7: per-exercise rest overrides (seconds). Defaults come from SEED.rest, so nothing else changes.
     s.restCfg = s.restCfg && typeof s.restCfg === 'object' ? s.restCfg : {};
+    // v8: warm-up checklist on each day's log (l.warmup). settings.warmOn defaults on.
     s.logs = s.logs && typeof s.logs === 'object' ? s.logs : {};
     Object.keys(s.logs).forEach(function (k) {
       var l = s.logs[k];
@@ -549,6 +551,7 @@
       lastSession: last ? { ago: ago(last, iso), dateLabel: fmtShort(last) } : null,
       exercises: exercises, skipped: skipped, feel: (l.feel || '').trim(), notes: (l.note || '').trim(),
       rom: { done: !!(l.rom), count: l.rom || 0, target: state.settings.romTarget || 3 },
+      warmup: warmupLine(l),
       nextLine: nexts.join('; ')
     };
   }
@@ -652,6 +655,59 @@
       '<button type="button" class="btn pri block coach" data-act="sendcoach" data-k="' + esc(iso) + '">Send to Coach</button></div>';
   }
 
+
+  function warmupState(l) {
+    if (!l.warmup || typeof l.warmup !== 'object') l.warmup = { cardio: false, dynamic: false, rom: false, ramp: false, romLogged: false };
+    return l.warmup;
+  }
+  function warmupLine(l) {
+    if (!l) return '';
+    var wu = l.warmup || {};
+    var n = W.IDS.filter(function (k) { return wu[k]; }).length;
+    if (!state.settings.warmOn && n === 0) return '';
+    return W.line(n, W.IDS.length);
+  }
+  function firstLiftEntry(l) {
+    var list = (l && l.entries) || [], i;
+    for (i = 0; i < list.length; i++) if (list[i] && list[i].kind === 'lb') return list[i];
+    for (i = 0; i < list.length; i++) if (list[i] && list[i].kind !== 'min') return list[i];
+    return list[0] || null;
+  }
+  function firstLiftTarget(l, iso) {
+    var en = firstLiftEntry(l);
+    if (!en) return { name: 'your first lift', w: 0, inc: 5 };
+    var w = 0;
+    if (en.kind === 'lb' && en.sets && en.sets[0] && +en.sets[0].w) w = +en.sets[0].w;
+    if (!w) {
+      var it = itemOf(l, en) || entryItem(l, en);
+      var n = Math.max((it && it.sets) || 0, (en.sets && en.sets.length) || 1);
+      var sg = suggestFor(en.ex, it, (l && l.whoop) || 'green', iso || ui.date, n);
+      w = +(sg && sg.w) || 0;
+    }
+    return { name: (exInfo(en.ex, en) || en).name, w: w, inc: cfgOf(en.ex).inc || 5 };
+  }
+  function warmupCard(iso, l, d) {
+    if (!state.settings.warmOn) return '';
+    var wu = warmupState(l);
+    var exs = (l.entries || []).map(function (en) { return exInfo(en.ex, en); });
+    var tgt = firstLiftTarget(l, iso);
+    var items = W.items(d, exs, { targetW: tgt.w, inc: tgt.inc, liftName: tgt.name });
+    var n = items.filter(function (it) { return wu[it.id]; }).length;
+    var all = n === items.length && items.length;
+    var h = '<div class="card warmup-card' + (all ? ' done' : '') + '"><details' + (all ? '' : ' open') + '>' +
+      '<summary class="warmup-sum"><div class="grow"><b>Warm-up</b><div class="muted small">' +
+      (all ? 'Done \u2014 you\u2019re ready to work.' : '5\u20138 min, especially when it\u2019s cold. Then the first work set.') +
+      '</div></div><span class="muted small">' + n + ' of ' + items.length + '</span></summary>';
+    h += '<div class="warmup-list">';
+    items.forEach(function (it) {
+      var on = !!wu[it.id];
+      h += '<button type="button" class="warmup-item' + (on ? ' on' : '') + '" data-act="warm" data-k="' + it.id + '">' +
+        '<span class="check' + (on ? ' on' : '') + '" aria-hidden="true">' + (on ? '\u2713' : '') + '</span>' +
+        '<span class="grow"><b>' + esc(it.title) + '</b><div class="muted small">' + esc(it.detail) + '</div></span></button>';
+    });
+    return h + '</div></details></div>';
+  }
+
   // ---------- views ----------
   function vToday() {
     var iso = ui.date, s = state.settings, t = todayKey();
@@ -712,6 +768,7 @@
         var exDone = l.entries.filter(function (e) { return e.sets.length && doneSets(e).length === e.sets.length; }).length;
         h += '<div class="card"><div class="row between"><h3>' + esc(d.name) + '</h3><span class="muted small">' + exDone + '/' + l.entries.length + ' done</span></div><p class="muted small">' + esc(d.focus || '') + '</p>' +
           '<div class="row wrap" style="margin-top:8px"><button class="btn sm" data-act="addentry">+ Exercise today</button><button class="btn sm ghost" data-act="rebuild">Reset session</button><span class="grow"></span><button class="btn sm" data-act="changewo">Change workout</button></div></div>';
+        h += warmupCard(iso, l, d);
         h += l.entries.map(function (en, ei) { return entryCard(en, ei, iso, l); }).join('');
         if (sessionDone(l)) {
           var allDone = l.entries.every(function (e) { return e.sets.length && doneSets(e).length === e.sets.length; });
@@ -928,6 +985,9 @@
       '<label class="q" style="border:0"><input type="checkbox" data-field="reston"' + (s.restOn ? ' checked' : '') + '><span>Start a rest timer when I check off a set</span></label>' +
       '<label class="q" style="border:0"><input type="checkbox" data-field="restsound"' + (s.restSound ? ' checked' : '') + '><span>Beep and vibrate when rest is over</span></label>' +
       '<p class="small muted">Change the rest for any exercise with its Adjust button. Defaults: 2:30 big lower-body lifts and chest press, 1:30 rows and other right-arm compounds, 1:15 isolation, 45–60 s core, none for cardio.</p></div>';
+    h += '<h2>Warm-up</h2><div class="card">' +
+      '<label class="q" style="border:0"><input type="checkbox" data-field="warmon"' + (s.warmOn ? ' checked' : '') + '><span>Show a checkable warm-up at the top of each session</span></label>' +
+      '<p class="small muted">5 min easy cardio (incline walk on leg days, bike on upper days), 1–2 min of dynamic work, a left-arm ROM primer, and 2–3 ramp-up sets on the first lift.</p></div>';
     h += '<h2>Backup</h2><div class="card"><p class="small muted">Everything is stored on this phone only. Export a backup now and then (it saves a .json file you can keep in Files or email to yourself).</p>' +
       '<div class="row"><button class="btn pri grow" data-act="export">Export backup</button><label class="btn grow" for="importfile">Import backup</label></div>' +
       '<input id="importfile" type="file" accept="application/json,.json" data-field="import" hidden></div>';
@@ -1273,6 +1333,16 @@
         l = getLog(iso); l.rom = Math.max(0, (l.rom || 0) + (+D.n)); save(); vibrate();
         if (+D.n > 0) toast('ROM session ' + l.rom + ' logged'); render(); return;
       }
+      case 'warm': {
+        l = getLog(ui.date);
+        var wu = warmupState(l), k = D.k, on = !wu[k];
+        wu[k] = on;
+        if (k === 'rom') {
+          if (on && !wu.romLogged) { l.rom = (l.rom || 0) + 1; wu.romLogged = true; vibrate(); toast('ROM session ' + l.rom + ' logged'); }
+          else if (!on && wu.romLogged) { l.rom = Math.max(0, (l.rom || 0) - 1); wu.romLogged = false; toast('ROM session removed'); }
+        } else vibrate();
+        l.warmup = wu; save(); render(); return;
+      }
       case 'habit': l = getLog(ui.date); l.habits = l.habits || {}; l.habits[D.k] = !l.habits[D.k]; save(); render(); return;
       case 'inc': case 'dec': {
         if (suppressClick) { suppressClick = false; return; }
@@ -1353,7 +1423,7 @@
       case 'rebuild': {
         l = state.logs[ui.date];
         if (l.entries.some(function (x) { return doneSets(x).length; }) && !confirm('Reset this session? Logged sets for this day will be cleared.')) return;
-        l.builtFor = null; l.entries = []; ensureSession(ui.date); render(); return;
+        l.builtFor = null; l.entries = []; delete l.warmup; ensureSession(ui.date); render(); return;
       }
       case 'pick': doPick(D.x); return;
       case 'showall': ui.sheet.all = true; renderSheet(); return;
@@ -1375,7 +1445,7 @@
         var cur = l.dayId || l.builtFor;
         if (hasWork && cur && cur !== D.d && !confirm('Switch workout? Sets you logged for this day will be replaced.')) return;
         ui.picking = false;
-        l.dayId = D.d; l.builtFor = null; l.entries = []; l.sig = '';
+        l.dayId = D.d; l.builtFor = null; l.entries = []; l.sig = ''; delete l.warmup;
         save();
         if (D.d !== 'rest') ensureSession(ui.date);
         render(); return;
@@ -1450,6 +1520,7 @@
     else if (f === 'rpeon') { state.settings.rpeOn = t.checked; save(); toast('Saved'); }
     else if (f === 'reston') { state.settings.restOn = t.checked; if (!t.checked) { timer = null; persistRest(); } save(); renderRest(); toast('Saved'); }
     else if (f === 'restsound') { state.settings.restSound = t.checked; if (t.checked) unlockAudio(); save(); toast('Saved'); }
+    else if (f === 'warmon') { state.settings.warmOn = t.checked; save(); render(); toast('Saved'); }
     else if (f === 'rstnum') { state.restCfg[ui.sheet.ex] = clamp(Math.round(num(t.value, restOf(ui.sheet.ex))), 0, 600); save(); renderSheet(); }
     else if (f === 'pnum') {
       var it = day(D.d).items[+D.i], v2 = Math.max(0, num(t.value, 0));
@@ -1459,7 +1530,7 @@
       l = getLog(ui.date);
       var hasWork = l.entries.some(function (x) { return doneSets(x).length; });
       if (hasWork && !confirm('Switch session? Sets you logged for this day will be replaced.')) { render(); return; }
-      l.dayId = t.value; l.builtFor = null; l.entries = []; save(); render();
+      l.dayId = t.value; l.builtFor = null; l.entries = []; delete l.warmup; save(); render();
     } else if (f === 'dname' || f === 'dfocus') { save(); }
     else if (f === 'q') { state.dec8.checked[+D.i] = t.checked; save(); }
     else if (f === 'histex') { ui.histEx = t.value; render(); }
@@ -1541,5 +1612,5 @@
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
     window.addEventListener('load', function () { navigator.serviceWorker.register('./service-worker.js').catch(function (e) { console.warn('SW', e); }); });
   }
-  window.__app = { get state() { return state; }, ui: ui, render: render, save: save, migrate: migrate, suggestFor: suggestFor, weekStats: weekStats, cfgOf: cfgOf, nextUp: nextUp, recentWorkouts: recentWorkouts, lastCompleted: lastCompleted, workoutSummary: workoutSummary, weeklySummary: weeklySummary, workoutSummaryData: workoutSummaryData, weeklySummaryData: weeklySummaryData, shareCoach: shareCoach, restOf: restOf, get timer() { return timer; }, restTick: restTick };
+  window.__app = { get state() { return state; }, ui: ui, render: render, save: save, migrate: migrate, suggestFor: suggestFor, weekStats: weekStats, cfgOf: cfgOf, nextUp: nextUp, recentWorkouts: recentWorkouts, lastCompleted: lastCompleted, workoutSummary: workoutSummary, weeklySummary: weeklySummary, workoutSummaryData: workoutSummaryData, weeklySummaryData: weeklySummaryData, shareCoach: shareCoach, restOf: restOf, get timer() { return timer; }, restTick: restTick, warmupLine: warmupLine };
 })();

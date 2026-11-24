@@ -118,6 +118,10 @@
     }
     if (o.feel) { lines.push('How it felt: ' + o.feel); lines.push(''); }
     if (o.notes) { lines.push('Notes: ' + o.notes); lines.push(''); }
+    if (o.warmup) {
+      var wu = String(o.warmup);
+      lines.push(/^warm-up:/i.test(wu) ? wu : 'Warm-up: ' + wu);
+    }
     if (o.rom) lines.push('ROM today: ' + (o.rom.done ? 'yes (' + o.rom.count + ' of ' + o.rom.target + ')' : 'no'));
     if (o.nextLine) { lines.push(''); lines.push('Next time (Whoop green): ' + o.nextLine); }
     return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim() + '\n';

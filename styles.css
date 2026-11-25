@@ -74,6 +74,8 @@ p { margin: 6px 0; }
 .callout.info { background: var(--acc-soft); }
 .badge { display: inline-block; font-size: 11px; font-weight: 700; padding: 3px 7px; border-radius: 999px; margin-top: 3px; white-space: nowrap; }
 .badge.ok { background: var(--ok-soft); color: var(--ok); } .badge.warn { background: var(--warn-soft); color: var(--warn); } .badge.bad { background: var(--bad-soft); color: var(--bad); }
+.badge.skip-early { margin-left: 4px; }
+.coach-note { margin-top: 8px; }
 .ex.done { border-color: var(--ok); } .ex.flag { border-color: var(--bad); }
 .ex-head { display: flex; gap: 10px; align-items: flex-start; }
 .ex-name { font-weight: 700; font-size: 17px; }

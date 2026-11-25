@@ -122,7 +122,32 @@
       // baseline session that landed well outside the intended range). Near-top first
       // sessions stay on normal double progression.
       var over = k === 'lb' && Wt > 0 && lr.some(function (r) { return r >= rmax + 3; });
-      if (over && ws.length) {
+      // Last-set bump (v12): if only the last working set is 3+ over rmax (and nothing
+      // missed the floor), add the normal increment and return to the programmed range.
+      // When every working set overshot, keep the v6 e1RM retune — that is a too-light weight,
+      // not a last-set blow-through. Timed and bodyweight work never hit this branch (k === 'lb').
+      var lastOver = k === 'lb' && Wt > 0 && lr.length && lr[lr.length - 1] >= rmax + 3;
+      var allOver = !!lr.length && lr.every(function (r) { return r >= rmax + 3; });
+      if (lastOver && !allOver && !missed && ws.length) {
+        var nwLast = r2(Wt + inc);
+        // Show mid–rmax (e.g. 8–10 on a 6–10 DB range) and prefill at mid, same idea as a retune landing.
+        res.reps = fill(mid);
+        res.repLo = mid;
+        res.repHi = rmax;
+        if (lh && nwLast > cap) {
+          if (Wt >= cap) {
+            res.action = 'cap'; res.label = 'At cap'; res.tone = 'warn'; res.w = cap; res.reps = fill(rmax);
+            delete res.repLo; delete res.repHi;
+            res.why = 'You\u2019re at your ' + cap + ' lb left-arm cap. No more weight until your surgeon clears it.';
+          } else {
+            res.action = 'weight'; res.label = '+' + r2(cap - Wt) + ' lb (cap)'; res.tone = 'ok'; res.w = cap;
+            res.why = 'Last set went past the range. Capped at your ' + cap + ' lb left-arm limit.';
+          }
+        } else {
+          res.action = 'weight'; res.label = '+' + r2(nwLast - Wt) + ' lb'; res.tone = 'ok'; res.w = nwLast;
+          res.why = 'Your last set went 3+ reps past the ' + rmin + '\u2013' + rmax + ' range. Add weight and build back up from ' + rmin + '.';
+        }
+      } else if (over && ws.length) {
         var bestE = 0;
         ws.forEach(function (s) { var e = epley(W(s), R(s)); if (e > bestE) bestE = e; });
         var uncapped = floorInc(bestE / (1 + (mid + 2) / 30), retuneStep(c, inc));

@@ -35,7 +35,7 @@
   var C = window.COACH;
   var RT = window.REST;
   var W = window.WARM;
-  var SCHEMA = 8;
+  var SCHEMA = 9;
   function seedDays() {
     return SEED.days.map(function (d) {
       return { id: d.id, name: d.name, focus: d.focus, weekdays: [], items: d.items.map(function (it) { var x = clone(it); x.id = uid(); return x; }) };
@@ -50,6 +50,8 @@
       days: seedDays(),
       exCfg: {},
       restCfg: {},
+      coachNotes: {},
+      dayNotes: {},
       logs: {},
       dec8: { checked: {}, answers: '' }
     };
@@ -116,6 +118,20 @@
     s.restCfg = s.restCfg && typeof s.restCfg === 'object' ? s.restCfg : {};
     // v8: warm-up checklist on each day's log (l.warmup). settings.warmOn defaults on.
     s.logs = s.logs && typeof s.logs === 'object' ? s.logs : {};
+    // v9: short coach notes on exercise cards (and optional per-day notes). Seed current
+    // recommendations once; never overwrite a note the user already wrote.
+    s.coachNotes = s.coachNotes && typeof s.coachNotes === 'object' ? s.coachNotes : {};
+    s.dayNotes = s.dayNotes && typeof s.dayNotes === 'object' ? s.dayNotes : {};
+    if (from < 9) {
+      var COACH_SEEDS = {
+        'hip-abd': 'Quick ones \u2014 do these before chest press.',
+        'bench-leg-raise': 'Quick ones \u2014 do these before chest press.',
+        'bss-r': 'Last set hit 14 \u2014 go 45 lb.'
+      };
+      Object.keys(COACH_SEEDS).forEach(function (id) {
+        if (s.coachNotes[id] == null || !String(s.coachNotes[id]).trim()) s.coachNotes[id] = COACH_SEEDS[id];
+      });
+    }
     Object.keys(s.logs).forEach(function (k) {
       var l = s.logs[k];
       if (!l || typeof l !== 'object') { delete s.logs[k]; return; }
@@ -301,10 +317,11 @@
     if (dayId === 'rest' || dayId === 'pick') return null;
     var d = day(dayId), l = getLog(iso);
     if (!d) return l.entries.length ? l : null;
-    var sig = sigOf(d, l.whoop);
+    var items = orderItems(d.items, dayId, iso);
+    var sig = sigOf(d, l.whoop) + '|ord:' + items.map(function (it) { return it.id; }).join(',');
     var anyTouched = l.entries.some(function (e) { return e.touched; });
     if (l.builtFor !== dayId || (!anyTouched && l.sig !== sig)) {
-      l.entries = d.items.map(function (it) { return makeEntry(it, l.whoop, iso); });
+      l.entries = items.map(function (it) { return makeEntry(it, l.whoop, iso); });
       l.builtFor = dayId; l.sig = sig; save();
     } else {
       // keep untouched cards in sync with the latest history, settings, and Whoop color
@@ -387,19 +404,24 @@
     var dn = doneSets(en).length, all = en.sets.length > 0 && dn === en.sets.length;
     var note = en.note || ex.notes;
     var capOver = ex.kind === 'lb' && leftHold(ex) && en.sets.some(function (s) { return s.w > state.settings.cap; });
-    var skipNudge = skippedLastTime(en.ex, workoutIdOf(l) || sessionDayId(iso), iso);
+    var dayIdForSkip = workoutIdOf(l) || sessionDayId(iso);
+    var skipNudge = skippedLastTime(en.ex, dayIdForSkip, iso);
+    var skipEarly = skipStreak(en.ex, dayIdForSkip, iso) >= 2;
+    var coachNote = coachNoteOf(en.ex);
     var sg = suggestFor(en.ex, entryItem(l, en), l.whoop, iso, ex.kind === 'min' ? 1 : en.sets.length || 1);
     var ctx = { last: last && last.kind === en.kind ? last : null, prs: entryPRs(en, iso), lastDone: -1, firstUndone: -1 };
     en.sets.forEach(function (s, i) { if (s.done) ctx.lastDone = i; else if (ctx.firstUndone < 0) ctx.firstUndone = i; });
     var why = sg.why + (ex.safety === 'caution' && (sg.action === 'weight' || sg.action === 'level') ? ' Only if the left arm stays fully passive.' : '');
     return '<div class="card ex' + (all ? ' done' : '') + (ex.safety === 'avoid' || en.pain ? ' flag' : '') + '" id="ex-' + esc(en.id) + '">' +
       '<div class="ex-head"><button class="check' + (all ? ' on' : '') + '" data-act="edone" data-e="' + ei + '" aria-label="Mark exercise done">' + (all ? '✓' : '') + '</button>' +
-      '<div class="grow"><div class="ex-name">' + esc(ex.name) + '</div>' + badge(ex.safety) + '</div>' +
+      '<div class="grow"><div class="ex-name">' + esc(ex.name) + '</div>' + badge(ex.safety) +
+      (skipEarly ? ' <span class="badge warn skip-early">skipped 2x \u2014 do it early</span>' : '') + '</div>' +
       '<button class="btn sm icon" data-act="adjust" data-e="' + ei + '" aria-label="Adjust targets and progression"><svg viewBox="0 0 24 24" class="ico"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg></button>' +
       '<button class="btn sm ghost" data-act="swap" data-e="' + ei + '">Swap</button></div>' +
       (ex.safety === 'avoid' ? '<div class="callout bad"><b>Loads the left arm</b>Not until your surgeon clears it. Tap Swap for a safe option.</div>' : '') +
       (capOver ? '<div class="callout bad">Over your ' + state.settings.cap + ' lb left-arm cap.</div>' : '') +
       (note ? '<p class="muted small">' + esc(note) + '</p>' : '') +
+      (coachNote ? '<div class="callout info coach-note">' + esc(coachNote) + '</div>' : '') +
       (skipNudge ? '<div class="callout warn">' + esc(C.skipNudge(ex.kind, sg)) + '</div>' : '') +
       '<div class="tgt ' + sg.tone + '"><div class="tgt-top"><span class="tag ' + sg.tone + '">' + (ARROW[sg.action] || '') + ' ' + esc(sg.label) + '</span>' +
       '<span class="tgt-v"><span class="muted">Today:</span> ' + targetText(sg, ex.kind, c) + '</span></div>' +
@@ -460,13 +482,60 @@
   function skippedLastTime(exId, dayId, beforeIso) {
     var k = lastCompleted(dayId, beforeIso);
     if (!k) return false;
+    return skippedInSession(exId, k);
+  }
+  function skippedInSession(exId, iso) {
+    var l = state.logs[iso];
+    if (!l) return false;
     var found = false, done = false;
-    ((state.logs[k].entries) || []).forEach(function (en) {
+    (l.entries || []).forEach(function (en) {
       if (en.ex !== exId) return;
       found = true;
       if (doneSets(en).length) done = true;
     });
     return found && !done;
+  }
+  function completedSessions(dayId, beforeIso) {
+    var ks = [];
+    Object.keys(state.logs).forEach(function (k) {
+      if (beforeIso && k >= beforeIso) return;
+      var l = state.logs[k];
+      if (workoutIdOf(l) !== dayId || !sessionDone(l)) return;
+      ks.push(k);
+    });
+    ks.sort();
+    return ks;
+  }
+  // 2 if this exercise was on, and not done, in both of the last two sessions of this day type.
+  function skipStreak(exId, dayId, beforeIso) {
+    var ks = completedSessions(dayId, beforeIso);
+    if (ks.length < 2) return 0;
+    var last2 = ks.slice(-2);
+    if (last2.every(function (k) { return skippedInSession(exId, k); })) return 2;
+    return 0;
+  }
+  // Move lifts skipped in the last 2 sessions of this day type to right after the first item
+  // (the main compound). Does not rewrite the saved program, only this session's order.
+  function orderItems(items, dayId, iso) {
+    if (!items || !items.length) return (items || []).slice();
+    var early = [], rest = [];
+    items.forEach(function (it, i) {
+      if (i > 0 && skipStreak(it.ex, dayId, iso) >= 2) early.push(it);
+      else rest.push(it);
+    });
+    if (!early.length) return items.slice();
+    if (!rest.length) return early;
+    return [rest[0]].concat(early).concat(rest.slice(1));
+  }
+  function coachNoteOf(exId) {
+    var n = state.coachNotes && state.coachNotes[exId];
+    return n ? String(n).trim() : '';
+  }
+  function setCoachNote(exId, text) {
+    state.coachNotes = state.coachNotes || {};
+    text = String(text || '').trim();
+    if (text) state.coachNotes[exId] = text;
+    else delete state.coachNotes[exId];
   }
   function nextUp(beforeIso) {
     var best = null, bestDate = null, bestIdx = 999;
@@ -766,7 +835,9 @@
       if (!l) h += '<div class="card"><p class="muted">This session no longer exists. <button class="btn sm" data-act="changewo">Pick a workout</button></p></div>';
       else {
         var exDone = l.entries.filter(function (e) { return e.sets.length && doneSets(e).length === e.sets.length; }).length;
+        var dayCoach = ((state.dayNotes || {})[d.id] || '').trim();
         h += '<div class="card"><div class="row between"><h3>' + esc(d.name) + '</h3><span class="muted small">' + exDone + '/' + l.entries.length + ' done</span></div><p class="muted small">' + esc(d.focus || '') + '</p>' +
+          (dayCoach ? '<div class="callout info">' + esc(dayCoach) + '</div>' : '') +
           '<div class="row wrap" style="margin-top:8px"><button class="btn sm" data-act="addentry">+ Exercise today</button><button class="btn sm ghost" data-act="rebuild">Reset session</button><span class="grow"></span><button class="btn sm" data-act="changewo">Change workout</button></div></div>';
         h += warmupCard(iso, l, d);
         h += l.entries.map(function (en, ei) { return entryCard(en, ei, iso, l); }).join('');
@@ -807,7 +878,8 @@
         }).join('') + '</ul>';
       } else {
         h += '<label class="f">Name<input type="text" data-field="dname" data-d="' + esc(d.id) + '" value="' + esc(d.name) + '"></label>' +
-          '<label class="f">Focus / cues<textarea rows="2" data-field="dfocus" data-d="' + esc(d.id) + '">' + esc(d.focus || '') + '</textarea></label>';
+          '<label class="f">Focus / cues<textarea rows="2" data-field="dfocus" data-d="' + esc(d.id) + '">' + esc(d.focus || '') + '</textarea></label>' +
+          '<label class="f">Coach note for this day<textarea rows="2" data-field="daycoach" data-d="' + esc(d.id) + '" placeholder="Optional reminder at the top of this workout">' + esc((state.dayNotes || {})[d.id] || '') + '</textarea></label>';
         h += '<ul class="list">' + d.items.map(function (it, i) {
           var ex = exInfo(it.ex);
           var steps = ex.kind === 'min' ? miniStep('min', 'pload', d.id, i, it.load)
@@ -999,7 +1071,7 @@
 
   // ---------- sheets ----------
   function openSheet(sh) { ui.sheet = sh; renderSheet(); }
-  function closeSheet() { ui.sheet = null; renderSheet(); }
+  function closeSheet() { ui.sheet = null; renderSheet(); render(); }
   function renderSheet() {
     var root = $('#sheet-root'), sh = ui.sheet;
     if (!sh) { root.innerHTML = ''; document.body.style.overflow = ''; return; }
@@ -1099,6 +1171,9 @@
     if (ex.safety !== 'safe') h += '<div class="callout ' + (ex.safety === 'avoid' ? 'bad' : 'warn') + '">' + (ex.safety === 'avoid' ? 'Loads the left arm, so it never gets an increase until you’re cleared.' : 'Increases only make sense if the left arm stays fully passive.') + '</div>';
     if (c.custom) h += '<button class="btn sm ghost block" data-act="cfgreset">Reset to defaults</button>';
     h += '</div>';
+    h += '<h2 style="margin-left:0">Coach note</h2><div class="card">' +
+      '<textarea class="note" rows="2" data-field="coachnote" data-x="' + esc(sh.ex) + '" placeholder="Short reminder on the session card, so you don\u2019t forget.">' + esc(coachNoteOf(sh.ex)) + '</textarea>' +
+      '<p class="small muted">Shows on this exercise in the session. Leave blank to hide it.</p></div>';
     return h + restCard(sh.ex);
   }
   function restCard(exId) {
@@ -1496,6 +1571,8 @@
     if (f === 'enote') { l = state.logs[ui.date]; l.entries[+D.e].notes = t.value; l.entries[+D.e].touched = true; saveSoon(); }
     else if (f === 'dnote') { l = getLog(ui.date); l.note = t.value; saveSoon(); }
     else if (f === 'feel') { l = getLog(ui.date); l.feel = t.value; saveSoon(); }
+    else if (f === 'coachnote') { setCoachNote(D.x || (ui.sheet && ui.sheet.ex), t.value); saveSoon(); }
+    else if (f === 'daycoach') { state.dayNotes = state.dayNotes || {}; if (t.value.trim()) state.dayNotes[D.d] = t.value; else delete state.dayNotes[D.d]; saveSoon(); }
     else if (f === 'dname') { day(D.d).name = t.value; saveSoon(); }
     else if (f === 'dfocus') { day(D.d).focus = t.value; saveSoon(); }
     else if (f === 'answers') { state.dec8.answers = t.value; saveSoon(); }
@@ -1531,7 +1608,7 @@
       var hasWork = l.entries.some(function (x) { return doneSets(x).length; });
       if (hasWork && !confirm('Switch session? Sets you logged for this day will be replaced.')) { render(); return; }
       l.dayId = t.value; l.builtFor = null; l.entries = []; delete l.warmup; save(); render();
-    } else if (f === 'dname' || f === 'dfocus') { save(); }
+    } else if (f === 'dname' || f === 'dfocus' || f === 'daycoach' || f === 'coachnote') { save(); }
     else if (f === 'q') { state.dec8.checked[+D.i] = t.checked; save(); }
     else if (f === 'histex') { ui.histEx = t.value; render(); }
     else if (f === 'alsoprog') { ui.sheet.alsoProg = t.checked; }
@@ -1612,5 +1689,5 @@
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
     window.addEventListener('load', function () { navigator.serviceWorker.register('./service-worker.js').catch(function (e) { console.warn('SW', e); }); });
   }
-  window.__app = { get state() { return state; }, ui: ui, render: render, save: save, migrate: migrate, suggestFor: suggestFor, weekStats: weekStats, cfgOf: cfgOf, nextUp: nextUp, recentWorkouts: recentWorkouts, lastCompleted: lastCompleted, workoutSummary: workoutSummary, weeklySummary: weeklySummary, workoutSummaryData: workoutSummaryData, weeklySummaryData: weeklySummaryData, shareCoach: shareCoach, restOf: restOf, get timer() { return timer; }, restTick: restTick, warmupLine: warmupLine };
+  window.__app = { get state() { return state; }, ui: ui, render: render, save: save, migrate: migrate, suggestFor: suggestFor, weekStats: weekStats, cfgOf: cfgOf, nextUp: nextUp, recentWorkouts: recentWorkouts, lastCompleted: lastCompleted, workoutSummary: workoutSummary, weeklySummary: weeklySummary, workoutSummaryData: workoutSummaryData, weeklySummaryData: weeklySummaryData, shareCoach: shareCoach, restOf: restOf, get timer() { return timer; }, restTick: restTick, warmupLine: warmupLine, skipStreak: skipStreak, orderItems: orderItems, coachNoteOf: coachNoteOf, setCoachNote: setCoachNote };
 })();
